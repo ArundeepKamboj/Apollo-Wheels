@@ -1,0 +1,11 @@
+[run]
+branch = True
+source =
+    services
+    apollo_wheels_mvp
+    scripts
+omit =
+    */tests/*
+    */test_support.py
+    */__pycache__/*
+

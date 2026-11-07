@@ -1,0 +1,12 @@
+{
+  "users": [
+    {"username": "testfinance", "user_id": "finance.alex", "display_name": "Finance · Alex", "role": "finance", "salt": "33cc878a97d8737128a3510474cbf2ab", "password_hash": "Ef8DL0Rxct0PmbKHknUpKRzDMef6yiOQkrk0Q1qzlM4"},
+    {"username": "testfinance2", "user_id": "finance.jordan", "display_name": "Finance · Jordan", "role": "finance", "salt": "937a35a7c095c88126a52e2d0cb9b568", "password_hash": "nDqATFCVxEWkrYvXImBqjLvzN5et5hxoGSP-AJkEmSQ"},
+    {"username": "teststructurer", "user_id": "structuring.lee", "display_name": "Structuring · Lee", "role": "structuring", "salt": "09b2f721b0944c6e92e669112819e4d1", "password_hash": "3I31zwBmuhUwJGvFvTau0KYyXNKPLpkhs1oqgW-O9VQ"},
+    {"username": "testadmin", "user_id": "admin.sam", "display_name": "Admin · Sam", "role": "admin", "salt": "1d1db37831badef5cdbd4869b24697f8", "password_hash": "L-Aplfwu4f0LGA5hUEcpYp_kwQBhBkUzhibWOSW2STo"}
+  ],
+  "services": [
+    {"client_id": "pricing-service", "secret_env": "AUTH_PRICING_SERVICE_SECRET", "salt": "cd58d0648ce349609bf088c9eb2f8e20", "secret_hash": "YEO-J_Dh8kVoDUO9YrwDNCCJhSE4ar-SFlyW-WZ1Qfg", "scopes": ["contract:read"]},
+    {"client_id": "billing-service", "secret_env": "AUTH_BILLING_SERVICE_SECRET", "salt": "8d00d6fbc829efcebb01597557ab43ed", "secret_hash": "wV9Mdy3pV9ZPLJ6gFZOfYnZT9Ho4-7lQ1_Tnbroberc", "scopes": ["contract:read", "pricing:read"]}
+  ]
+}
