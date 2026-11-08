@@ -28,7 +28,16 @@ def target_service(path: str) -> str:
     if path.startswith("/api/pricing/") or path.endswith("/pricing"):
         return "PRICING_API_URL"
     if path.startswith(("/api/audit/", "/api/files/")) or any(
-        marker in path for marker in ("/billing-history", "/billing-documents", "/billing-combined", "/pdfs", "/audit")
+        marker in path
+        for marker in (
+            "/billing-history",
+            "/billing-documents",
+            "/billing-combined",
+            "/billing-forecast",
+            "/billing-pdfs",
+            "/pdfs",
+            "/audit",
+        )
     ):
         return "BILLING_API_URL"
     return "CONTRACT_API_URL"

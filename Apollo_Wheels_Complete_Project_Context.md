@@ -988,3 +988,137 @@ The initial requirements did not spell out the role/approval workflow, internal 
 ## Remaining implementation gaps
 
 The requirements remain broader than the current implementation. The UI now shows field-level marker confidence and source excerpts, but does not overlay highlights on the PDF. An optional Ollama extraction path is wired but has not been run or evaluated. Robust extraction of varied agreement prose, OCR, production identity/authentication, full financial rules, error/retry handling, and formal automated tests remain open. The default parser is deterministic for generated documents and must be described honestly.
+
+## 20. Presentation and live-demo plan — working draft
+
+**Purpose:** Keep the story, prototype walkthrough, and leadership case together so this section can be revised as the product and demo improve. This is a presentation plan, not a claim that every target or future capability is already delivered.
+
+### 20.1 One-sentence pitch and story
+
+**Pitch:** Turn a manually reviewed agreement into controlled pricing setup, then compare that setup with billing so Finance can find preventable errors and missed charges earlier.
+
+Tell it as one customer journey: a new client signs an agreement; Finance must turn terms scattered across a PDF into accurate, approved setup; after launch, the first bill must reflect those terms. The metaphor is a plane journey, and the four-part brief maps onto it directly — **Frame the Problem = takeoff, Design the Architecture + Build the POC = in flight, Sell It to Leadership = landing**:
+
+- **Takeoff (Frame the Problem):** Get the agreement and its terms off the runway and into a reviewable, approved setup. Scope the MVP, state what success looks like in 30 days, and set expectations about what the prototype can and cannot do.
+- **In flight (Design the Architecture + Build the POC):** Keep the setup on course. Sketch the AI pipeline from data sources through the LLM layer to output, then actually fly it — upload, extract, review, approve, activate, and reconcile against billing.
+- **Landing (Sell It to Leadership):** Make the result safe to act on. Land the demo with ROI, risks, and the next decision, so exceptions are resolved before they become repeated billing errors.
+
+The customer-journey language is a narrative device, not a claim that the prototype connects to live Wheels billing systems.
+
+### 20.1b Story spine — the walkthrough as a narrative
+
+Structure the demo around one named client so the audience follows a single thread rather than four disconnected features. A good fit for the synthetic dataset is **Northstar Fleet Services (C-1001)** — a 20,000-vehicle fleet with 15,000 owned and 5,000 leased vehicles, an MSA covering nine subscribed services and an MLA covering 500 leased Ford Transit hybrids at USD 1,200 per vehicle-month. Northstar is already seeded in the app, so the demo can start from a known state and still show the new-client path by adding a second, smaller client mid-walkthrough.
+
+The spine, in story order:
+
+1. **The worry (takeoff).** "We signed Northstar's agreement last quarter. Finance still has to find the service rates, vehicle counts, and billing day across a 20-page PDF and type them into the Pricing Manager by hand — and if a decimal moves, we overbill or underbill them for months."
+2. **The first beat (in flight, upload).** Upload Northstar's MSA. The app detects the client, the agreement type, and the subscribed services, and puts the source PDF on the left with extracted terms on the right. The reviewer corrects a value and saves — the correction is traceable to the source page.
+3. **The control beat (in flight, approval).** Finance user 1 prepares pricing; a distinct Finance user 2 approves. Emphasize the point: extraction proposes, but no pricing activates until a second person approves. The approved setup is now the active, versioned record.
+4. **The exception beat (in flight → landing).** Open the billing-audit view for Northstar. One service shows a rate in the invoice that does not match the approved setup — flagged with the contract clause, the pricing record, and the invoice line as evidence. The reviewer can see exactly why it was flagged and what to fix.
+5. **The landing.** "We went from a paper agreement to an approved, auditable setup in minutes, caught a billing exception before it repeated, and every step is traceable. Here is what that is worth, what it still cannot do, and what we need from you to test it for real."
+
+If a single end-to-end synthetic chain (agreement → pricing → invoice) cannot be shown fully linked, say so plainly and label the audit case as a separate sample. Honesty about the gap beats a confident but false claim.
+
+### 20.2 Takeoff — frame the problem and define the MVP
+
+**Problem framing:** The current process described in the assessment relies on emailed agreements and manual Finance review and setup. Contract terms, pricing configuration, and billed amounts can drift apart. That creates risks of incorrect or missed billing and makes audits slower. Treat time spent, error frequency, and financial impact as hypotheses to measure with Wheels stakeholders, not established baselines.
+
+**MVP user and job:** An internal Finance user uploads an agreement, reviews extracted terms against source evidence, corrects the client or terms, and prepares pricing for controlled approval. Finance can also inspect billing-period exceptions against contract and pricing data.
+
+**MVP boundary:**
+
+- In scope: manual PDF upload; supported text-based/synthetic agreement parsing; visible extracted facts and evidence; correcting a detected or new client; saving a draft; pricing setup and approval flow; billing audit/reconciliation with explainable exceptions; local demonstration with synthetic data.
+- Not a promise for this prototype: automated email ingestion, full contract coverage, production billing-system integration, unattended activation, guaranteed extraction accuracy, OCR for arbitrary scans, or a quantified recovery of revenue.
+- Keep human review and the approval control in the story. Extraction proposes; deterministic checks and authorized people decide.
+
+**Success in 30 days — proposed pilot goals, to baseline and confirm with Finance:**
+
+| Measure | Proposed 30-day outcome | How to measure |
+|---|---|---|
+| Setup speed | Reduce median agreement-to-approved-setup time by at least 30% from the measured current-process baseline | Timestamp a representative manual sample and a pilot sample using the same start/end definitions |
+| Critical-term quality | At least 95% precision on an agreed set of critical fields in a representative, human-labeled test set before expanding usage | Score extracted values against reviewed ground truth; report field-level results and sample size |
+| Control | 100% of pricing activations in the pilot have a recorded, distinct second-person approval | Audit workflow records; do not count a demo-only click path as production control evidence |
+| Audit usefulness | Measure exception precision and time-to-triage against a reviewed sample; set the numeric acceptance threshold with Finance before the pilot | Label true/false exceptions and time how long reviewers take to resolve them |
+| Adoption and outcome | Finance users complete a small, agreed pilot cohort and provide structured feedback; calculate any verified billing impact only from validated exceptions | Record cohort size, completion, feedback, and Finance-confirmed amounts without extrapolating synthetic data |
+
+These are proposed targets, not measured results. If the baseline, dataset, or pilot access is unavailable, report that constraint and establish the measurement plan rather than presenting a fabricated ROI.
+
+### 20.3 In flight — architecture and AI pipeline
+
+```mermaid
+flowchart LR
+    A[Agreement PDF and billing PDF] --> B[Document storage and metadata]
+    B --> C[Contract or billing extraction]
+    C --> D[Normalize fields and retain source evidence]
+    D --> E[Deterministic validation and confidence checks]
+    E --> F[Finance review and correction]
+    F --> G[Pricing API and second-person approval]
+    G --> H[Versioned approved pricing]
+    H --> I[Compare contract, pricing, and billed lines]
+    I --> J[Explainable exceptions for Finance]
+    J --> K[Review, resolve, and measure]
+```
+
+**Tools and rationale for the current POC:**
+
+- **Python and FastAPI:** Short feedback loops and a good fit for document processing, validation, and separate Contract, Pricing, and Billing/Audit APIs.
+- **Plain HTML/CSS/JavaScript:** Keeps the local UI easy to run and inspect while the workflow is being validated.
+- **REST and a one-command local runner:** Makes service boundaries visible without adding broker/deployment overhead before the workflow requires it.
+- **SQLite/relational operational records plus flexible JSON terms; PDFs stored as files:** Supports workflow, identity, approval, and reconciliation while allowing variable agreement fields. Production storage remains an architecture decision.
+- **AI extraction behind a provider boundary:** Use structured output, field validation, source evidence, and human review. The current default parser is deterministic for generated/labeled sample documents. An optional Ollama-compatible path is wired but has not been evaluated; do not describe the POC as proven general-purpose LLM extraction.
+- **Synthetic PDFs and billing cases:** Make the demo repeatable without exposing client data. Do not treat synthetic contract prices or exception amounts as Wheels business facts.
+
+### 20.4 Demo run — make the prototype the proof
+
+**Target duration: 30–40 minutes total, including Q&A.** Build the demo to run in under 10 minutes of screen time so the remaining time is discussion. A tight, repeatable script matters more than breadth here.
+
+**Suggested 8–10 minute walkthrough (timed):**
+
+1. **Takeoff (1 minute):** State the problem and the one outcome: a reviewer can trace setup back to the agreement before billing begins.
+2. **Upload and review (2 minutes):** Upload the synthetic agreement for a new client. Show the detected client and terms, source evidence, and how the reviewer can correct the name or values. Save the draft and show that the new client becomes available. This demonstrates that onboarding is not limited to the two seeded clients.
+3. **Control (1.5 minutes):** Walk through pricing preparation and approval. Emphasize that extraction does not silently activate pricing and that the approving user is distinct where the prototype supports that control.
+4. **In flight / landing (2.5 minutes):** Open a clearly labeled, pre-seeded billing-audit case and show the contract/pricing/billed comparison, the exception, and its evidence. Prefer one client journey end-to-end if a matching synthetic agreement, pricing record, and invoice are prepared and verified; otherwise explicitly label the audit case as a separate sample rather than implying the data is linked.
+5. **Landing (1–2 minutes):** State what worked live, what remains unproven, how the 30-day pilot will measure value, and the decision or access needed next.
+
+**Demo readiness checklist:** Start the full stack from a clean terminal; verify both upload and audit workflows before the session; use only synthetic fixtures; reset to a known state; keep one backup recording or screenshots for network/process failure; never claim an untested branch as working. The new-client upload/save path has backend and browser regression coverage. Confirm the current end-to-end approval and billing-audit paths against the latest build before presenting them.
+
+**Demo readiness checklist:** Start the full stack from a clean terminal; verify both upload and audit workflows before the session; use only synthetic fixtures; reset to a known state; keep one backup recording or screenshots for network/process failure; never claim an untested branch as working. The new-client upload/save path has backend and browser regression coverage. Confirm the current end-to-end approval and billing-audit paths against the latest build before presenting them.
+
+### 20.5 Landing — leadership case, risks, and next steps
+
+**ROI case:** The value hypothesis is less manual setup and audit effort, fewer preventable billing discrepancies, and earlier discovery of missed charges. Quantify only after measuring the current process and validating exception amounts with Finance. A simple model for the pilot is:
+
+`verified annual value = (hours saved × loaded hourly cost) + Finance-validated recovered or avoided billing impact − implementation and operating cost`
+
+Keep time savings and financial impact as separate, auditable inputs; do not multiply synthetic demo values into an ROI claim.
+
+**Risks and mitigations:**
+
+- Incorrect extraction or missed clauses → evidence-linked review, field-level evaluation, validation rules, and human approval.
+- Scanned/variable PDFs and weak model quality → disclose current text/sample limits; test a representative corpus and OCR/model options before broader rollout.
+- False-positive or missed billing exceptions → agree on matching and billing rules with Finance; label a sample and monitor precision/recall before operational reliance.
+- Unauthorized or untraceable pricing changes → distinct approver, role-based access, and audit history; validate production identity and authorization separately.
+- Sensitive documents or model exposure → begin with synthetic data; complete data handling, retention, access, and model-hosting review before real agreements.
+- Integration and operational failures → pilot with manual upload, explicit errors, backups, and reconciliation; add system integrations and reliability controls only with owners and requirements.
+
+**30-day next steps:** Week 1: align with Finance on field definitions, approval rules, representative documents, baseline timing, and billing match rules. Week 2: evaluate extraction against labeled examples and close the highest-impact workflow gaps. Week 3: run a limited, human-reviewed pilot and measure setup time and exception quality. Week 4: review results, security/operations readiness, user feedback, and go/no-go criteria; propose integration and scale investments only from that evidence.
+
+**Leadership ask:** Sponsor a small Finance pilot, provide a representative (approved and appropriately protected) document/billing sample and a process owner, and agree on the measurement and approval criteria. The next decision is whether the evidence justifies a controlled pilot—not whether to trust autonomous billing changes.
+
+### 20.6 Presentation structure and working notes
+
+Use five concise slides, with the live demo early if time is short:
+
+1. **Takeoff: the gap** — Agreement → manual setup → billing; risks and user.
+2. **Takeoff: the MVP** — What is in scope, what is deliberately not, and the proposed 30-day measures.
+3. **In flight: architecture** — Data sources → extraction/validation → human approval → pricing and reconciliation.
+4. **In flight to landing: live demo** — New-client agreement review/save, controlled pricing path, and a labeled billing exception.
+5. **Landing: value and decision** — ROI model, risks, next 30 days, and the leadership ask.
+
+**Open items to revisit before finalizing slides:** Confirm the presentation duration; agree the numeric success thresholds and baseline with Finance; verify which approval/audit screens are demo-ready; prepare a coherent synthetic end-to-end dataset or disclose the separate audit scenario; replace proposed goals with measured results only after a pilot.
+
+**Duration: 30–40 minutes, including Q&A** (confirmed for this assessment). Build the demo to run in under 10 minutes of screen time so the remaining time is discussion. A tight, repeatable script matters more than breadth here.
+
+**Fix applied (8 Nov 2026):** The local demo stack was seeding an empty DB because each service independently called `seed_demo_data()` without `include_workflow_history=True`. Fixed by changing `seed_demo_data()` → `seed_demo_data(include_workflow_history=True)` in `services/contract_service/main.py`, `services/pricing_service/main.py`, and `services/billing_service/main.py`. After a clean DB restart, the demo now seeds: 2 clients, 4 agreements, 22 pricing components, 12 billing documents, 62 billing lines, 2 approval requests. Verified end-to-end: audit returns 31 rows with 2 discrepancies (RR rate mismatch in Feb, FUEL activation fee in Jan), billing history shows 3 periods, combined billing shows service + lease totals.
+
+**Next work — committed:** The next deliverable is a **complete end-to-end demo script** (walkthrough steps, timing, expected outputs, and what to say at each beat), to be produced later as a separate artifact. It will be written against the timed walkthrough in §20.4 and the Northstar story spine in §20.1b. It is deliberately sequenced *after* this plan is finalized so the plan's scope and timing decisions stay authoritative. All other P0 build items (PDF source-highlight overlay, combined-billing view, failure/idempotency hardening) remain deferred to a later pass and are not part of the demo script unless the script surfaces a gap that must be fixed to keep the demo honest.
