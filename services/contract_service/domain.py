@@ -12,6 +12,7 @@ from fastapi import UploadFile
 from apollo_wheels_mvp.documents import extract_pdf_pages
 from apollo_wheels_mvp.extraction import detect_agreement_type, extract_agreement_terms
 from apollo_wheels_mvp.storage import DOCUMENT_DIR, connect
+from apollo_wheels_mvp.synthetic import write_msa_from_extracted, write_mla_from_extracted
 
 
 def list_agreements(client_id: str | None = None, agreement_type: str | None = None, active_only: bool = True) -> list[dict[str, object]]:
@@ -111,6 +112,9 @@ def save_agreement_version(
     new row is inserted with an incremented version number. list_agreements
     filters on is_active=1 and orders by version DESC, so the latest version
     is what callers see by default.
+
+    A new PDF is regenerated from the extracted terms, providing a visual
+    audit trail of the changes made.
     """
     with connect() as db:
         old_row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
@@ -126,17 +130,32 @@ def save_agreement_version(
             (update_comment, agreement_id)
         )
 
-        # Insert the new version. It reuses the same stored PDF (file_path) and
-        # the same client/agreement_type, so the source document stays linked.
+        # Regenerate the PDF from the updated extracted terms.
+        # This provides a visual audit trail of the structured edits.
+        agreement_type = old_row["agreement_type"].upper()
+        client_id = old_row["client_id"]
+        client_name = old_row.get("client_name") or old_row["client_id"]
+        version_label = str(new_version)
+
+        new_filename = f"{agreement_type.lower()}_v{new_version}_{uuid.uuid4().hex[:8]}.pdf"
+        new_path = DOCUMENT_DIR / new_filename
+
+        if agreement_type == "MSA":
+            write_msa_from_extracted(new_path, client_id, client_name, extracted, version_label)
+        elif agreement_type == "MLA":
+            write_mla_from_extracted(new_path, client_id, client_name, extracted, version_label)
+        else:
+            raise ValueError(f"Unknown agreement type: {agreement_type}")
+
+        # Insert the new version with the new PDF path.
         new_id = str(uuid.uuid4())
         db.execute(
             """INSERT INTO agreements
                (id, client_id, agreement_type, version_label, filename, file_path,
                 effective_date, status, uploaded_by, extracted_json, version, is_active, update_comment)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (new_id, old_row["client_id"], old_row["agreement_type"], str(new_version),
-             old_row["filename"], old_row["file_path"], old_row["effective_date"],
-             "review", actor, json.dumps(extracted), new_version, 1, update_comment)
+            (new_id, client_id, agreement_type, version_label, new_filename, str(new_path),
+             old_row["effective_date"], "review", actor, json.dumps(extracted), new_version, 1, update_comment)
         )
         row = db.execute("SELECT * FROM agreements WHERE id=?", (new_id,)).fetchone()
         return agreement_dict(row)

@@ -701,16 +701,16 @@ function renderAgreementFacts(agreement) {
 function renderTermsEditor(agreement, isDraft = false) {
   const extracted = agreement.extracted || {};
   const disabled = state.role !== "structuring" ? "disabled" : "";
-  // For drafts, only client name and agreement type are editable; all other fields disabled until saved
-  const draftDisabled = isDraft ? "disabled" : "";
+  // For drafts, client name and agreement type are editable; other fields are read-only until saved
+  const editable = disabled === "" || isDraft; // editing allowed in structuring role OR for drafts
   const clientName =
     state.clients.find((c) => c.id === agreement.client_id)?.name ||
     agreement.client_id;
   const draftClientNameInput = isDraft
-    ? `<div class="control"><label>Client name (detected)</label><input data-draft-field="client_name" value="${esc(clientName)}" ${draftDisabled}></div>`
+    ? `<div class="control"><label>Client name</label><input data-draft-field="client_name" value="${esc(clientName)}" ${editable ? "" : "disabled"}></div>`
     : "";
   const draftAgreementTypeInput = isDraft
-    ? `<div class="control"><label>Agreement type (detected)</label><select data-draft-field="agreement_type" ${draftDisabled}><option value="MSA" ${agreement.agreement_type === "MSA" ? "selected" : ""}>MSA</option><option value="MLA" ${agreement.agreement_type === "MLA" ? "selected" : ""}>MLA</option></select></div>`
+    ? `<div class="control"><label>Agreement type</label><select data-draft-field="agreement_type" ${editable ? "" : "disabled"}><option value="MSA" ${agreement.agreement_type === "MSA" ? "selected" : ""}>MSA</option><option value="MLA" ${agreement.agreement_type === "MLA" ? "selected" : ""}>MLA</option></select></div>`
     : "";
 
   if (agreement.agreement_type === "MLA") {

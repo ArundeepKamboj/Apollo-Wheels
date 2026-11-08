@@ -5,6 +5,7 @@ from __future__ import annotations
 from io import BytesIO
 from pathlib import Path
 import re
+import uuid
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
@@ -459,3 +460,105 @@ def write_demo_invoice(
     path.write_bytes(make_text_pdf(lines))
     return {"invoice_number": number, "filename": filename, "path": path, "lines": lines, "stream": stream,
             "period_start": period_start, "period_end": period_end}
+
+
+def write_mla_from_extracted(path: Path, client_id: str, client_name: str, extracted: dict[str, object], version: str) -> Path:
+    """Generate an MLA PDF from extracted terms (used for regeneration after save)."""
+    from .extraction import extract_agreement_terms
+
+    lease = extracted.get("lease", {}) or {}
+    if not lease:
+        raise ValueError("No lease data in extracted terms")
+
+    lease_quantity = lease.get("quantity", 300)
+    lease_rate = lease.get("contract_amount", 1050.00)
+    lines = [
+        "MASTER LEASE AGREEMENT",
+        f"CLIENT_ID: {client_id}",
+        f"CLIENT_NAME: {client_name}",
+        f"AGREEMENT_ID: MLA-REGEN-{uuid.uuid4().hex[:8].upper()}",
+        "AGREEMENT_TYPE: MLA",
+        f"VERSION: {version}",
+        f"EFFECTIVE_DATE: {lease.get('effective_from', '2026-01-01')}",
+        f"This sample agreement records the vehicle lease terms between Apollo Wheels LLC and {client_name}, LLC.",
+        *_template_agreement_lines("MLA", client_name, "MLA"),
+        "The vehicle and lease schedule below forms part of this Agreement and states the assets, rental, term and billing arrangement.",
+        f"LEASE|LEASE-01|Fleet vehicle lease|{lease_quantity}|vehicle_month|{lease_rate:.2f}|48|{lease.get('effective_from', '2026-01-01')}|{lease.get('billing_frequency', 'monthly')}|1|{lease.get('vehicle_make', 'Ford')}|{lease.get('vehicle_model', 'Transit')}|{lease.get('engine_type', 'Hybrid')}|USD",
+        "END_OF_AGREEMENT",
+    ]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(make_text_pdf(lines))
+    return path
+
+
+def write_msa_from_extracted(path: Path, client_id: str, client_name: str, extracted: dict[str, object], version: str) -> Path:
+    """Generate an MSA PDF from extracted terms (used for regeneration after save)."""
+    services = extracted.get("services", [])
+    components = extracted.get("components", [])
+
+    if not services and not components:
+        raise ValueError("No service or component data in extracted terms")
+
+    service_lines: list[str] = []
+    for svc in services:
+        svc_code = svc.get("service_code", "UNKNOWN")
+        svc_name = svc.get("service_name", "Unknown Service")
+        subscribed = svc.get("subscribed", False)
+        component = "monthly_per_vehicle" if svc_code.endswith("_VEHICLE") else "monthly_account_fee"
+        rate = svc.get("contract_amount", 0)
+        unit = svc.get("rate_unit", "vehicle_month")
+        basis = svc.get("pricing_basis", "USD")
+        frequency = svc.get("billing_frequency", "monthly")
+        day = svc.get("billing_day", "1")
+        vehicles = svc.get("vehicle_count", 0)
+        drivers = svc.get("driver_count", 0)
+        qty = f"{vehicles} covered vehicles" if vehicles else f"{drivers} covered drivers" if drivers else "the Customer account"
+        status = "Included" if subscribed else "Not selected"
+
+        if basis == "PERCENTAGE":
+            rate_sentence = f"{rate:.2f} percent of monthly spend"
+        elif basis == "BASIS_POINTS":
+            rate_sentence = f"{rate:.2f} basis points of transaction value"
+        else:
+            rate_sentence = f"USD {rate:.2f} per {unit.replace('_', ' ')}"
+
+        charge = component.replace("_", " ")
+        service_lines.append(
+            f"SERVICE|{svc_code}|{svc_name}|{str(subscribed).lower()}|SERVICE|{charge}|"
+            f"{rate:.2f}|{unit}|recurring|{basis}|{frequency}|{day}|{vehicles}|{drivers}"
+        )
+
+    for comp in components:
+        comp_code = comp.get("component_name", "activation")
+        comp_label = comp.get("component_name", "Setup")
+        charge_type = comp.get("charge_type", "one_time")
+        amount = comp.get("contract_amount", 250.00)
+        unit = comp.get("rate_unit", "account")
+        qty = comp.get("quantity", 1)
+        service_lines.append(f"COMPONENT|{comp_code}|{comp_label}|{charge_type}|{charge_type}|{amount:.2f}|{unit}|{qty}")
+
+    if not service_lines:
+        raise ValueError("No service or component data to generate MSA")
+
+    prefix = "REGEN"
+    msa_filename = f"{prefix}_{client_id}_{version}.pdf"
+    msa_path = path.parent / msa_filename
+    service_lines.append("COMPONENT|FUEL|activation|One-time setup|one_time|250.00|account|1")
+
+    all_lines = [
+        "MASTER SERVICES AGREEMENT",
+        f"CLIENT_ID: {client_id}",
+        f"CLIENT_NAME: {client_name}",
+        f"AGREEMENT_ID: {prefix}-MSA-001",
+        "AGREEMENT_TYPE: MSA",
+        f"VERSION: {version}",
+        "EFFECTIVE_DATE: 2026-01-01",
+        f"This sample agreement records the terms on which Apollo Wheels LLC provides fleet management services to {client_name}, LLC.",
+        *_template_agreement_lines("MSA", client_name, prefix),
+        "Schedule 1 forms part of this Agreement. Each service section below states the service scope, selection status, billing basis, recurring charge and initial quantity basis.",
+        "SECTION: Schedule 1 - Services and recurring charges",
+        *service_lines,
+        "END_OF_AGREEMENT",
+    ]
+    msa_path.write_bytes(make_text_pdf(all_lines))
+    return msa_path
