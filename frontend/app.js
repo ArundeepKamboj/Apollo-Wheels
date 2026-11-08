@@ -22,7 +22,7 @@ const state = {
   contractMode: "existing", // 'existing' or 'upload'
   pricingDraft: [],
   apiData: null,
-  showEvidence: true,
+  showEvidence: false,
   showConfidence: true,
 };
 const $ = (s) => document.querySelector(s);
@@ -675,9 +675,10 @@ function confidenceLabel(item, field) {
 function renderEvidence(item, field) {
   const page = item.evidence_page || 1;
   const quote = item.source_text || "";
-  const evidenceHtml = state.showEvidence
-    ? `<div class="field-evidence" data-source-page="${page}" data-source-text="${esc(quote)}" title="Hover or focus to highlight this evidence in the PDF">Evidence - page ${page}: ${esc(quote || "No source quote found")}</div>`
-    : "";
+  // The highlight source element is always rendered so hovering/focusing a
+  // field highlights its source in the PDF regardless of the toggle. The
+  // toggle only controls whether the evidence text is visible.
+  const evidenceHtml = `<div class="field-evidence" data-source-page="${page}" data-source-text="${esc(quote)}" title="Hover or focus to highlight this evidence in the PDF" ${state.showEvidence ? "" : "hidden"}>Evidence - page ${page}: ${esc(quote || "No source quote found")}</div>`;
   const confidenceHtml = state.showConfidence
     ? `<div class="small muted">${esc(confidenceLabel(item, field))}</div>`
     : "";
