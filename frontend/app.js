@@ -913,6 +913,12 @@ async function saveTerms() {
     });
     // Update state to the new version so the PDF loads the regenerated version
     state.selectedAgreement = saved.id;
+    // Refresh the agreements list to include the new version
+    if (state.contractExistingClientId && state.contractExistingAgreementType) {
+      state.agreements = await api(
+        `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`
+      );
+    }
     notify("New version saved with audit comment");
     await renderContracts();
   } catch (error) {
