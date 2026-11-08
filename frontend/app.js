@@ -736,10 +736,10 @@ function renderTermsEditor(agreement, isDraft = false) {
     .map(
       (service, index) => `
     <div class="service-edit">
-      <div><b>${esc(service.service_name)}</b>${renderEvidence(service, "contract_amount")}</div>
+      <div><b>${esc(service.service_name)}</b><span class="service-rate">$${service.contract_amount?.toFixed(2) ?? "0.00"}</span>${renderEvidence(service, "contract_amount")}</div>
       <label class="checkline"><input class="checkbox" type="checkbox" data-service="${index}" ${service.subscribed ? "checked" : ""} ${disabled}> Included</label>
       <input type="number" min="0" step="0.01" data-amount="${index}" value="${service.contract_amount ?? ""}" ${disabled} aria-label="${esc(service.service_name)} contract rate">
-      <details class="service-details" open><summary>Extracted rate fields</summary><div class="three">
+      <details class="service-details" open><summary>Extracted fields</summary><div class="three">
         ${[
           ["pricing_basis", "Pricing basis"],
           ["rate_unit", "Rate unit"],

@@ -724,6 +724,11 @@ td input,td select {
   font:700 18px 'Manrope';
   margin-top:5px
 }
+.service-rate {
+  font-weight: 600;
+  color: var(--accent);
+  margin-left: 8px;
+}
 .toast {
   position:fixed;
   bottom:22px;
