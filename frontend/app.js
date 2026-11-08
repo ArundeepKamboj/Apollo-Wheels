@@ -213,16 +213,19 @@ async function loadAgreementPdf(agreementId) {
     '<div class="pdf-loading" role="status">Loading agreement pages...</div>';
   try {
     const url = `${SERVICE_URLS.gatewayApi}/api/agreements/${agreementId}/pdf`;
-    const response = await fetch(
-      url,
-      { headers: { Authorization: `Bearer ${state.token}` } },
-    );
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${state.token}` },
+    });
     if (!response.ok) {
       // If the PDF endpoint fails for a draft (e.g., file_path missing), try
       // to fall back to the temp_file_path that was returned by upload-draft.
       // This is a temporary bridge until the draft PDF route is explicitly fixed.
       const draft = state.uploadedAgreement;
-      if (state.contractMode === "upload" && draft?.temp_file_path && response.status === 404) {
+      if (
+        state.contractMode === "upload" &&
+        draft?.temp_file_path &&
+        response.status === 404
+      ) {
         // Serve the temp file via the same endpoint if it exists. The backend
         // already stores the draft file path in agreements.file_path, so the
         // normal /pdf endpoint should work. If not, we keep the error.
@@ -499,7 +502,8 @@ async function renderContracts() {
   // No auto-load. selectedAgreement is only set by Fetch agreement button.
   // Upload mode uses uploadedAgreement.
   if (state.contractMode === "existing") {
-    const hasPick = state.contractExistingClientId && state.contractExistingAgreementType;
+    const hasPick =
+      state.contractExistingClientId && state.contractExistingAgreementType;
     if (!hasPick) {
       state.selectedAgreement = null;
     }
@@ -572,9 +576,17 @@ async function renderContracts() {
       <div id="terms-editor" class="scroll-panel">${selected ? renderTermsEditor(selected, isDraft) : '<div class="empty contract-empty">Select an existing client or upload a PDF to view extracted terms.</div>'}</div>
       <div class="row spread contract-footer">
         <span class="small muted">All 13 services are represented in the catalogue.</span>
-        ${selected ? (isDraft
-          ? (state.role === "structuring" ? '<button class="btn btn-primary" id="save-draft-btn">Save in system</button>' : '<button class="btn btn-primary" id="save-draft-btn" disabled>Save in system</button>')
-          : (state.role === "structuring" ? '<button class="btn btn-primary" id="save-terms">Save Structuring edits</button>' : '<button class="btn btn-primary" id="save-terms" disabled>Save Structuring edits</button>')) : ""}
+        ${
+          selected
+            ? isDraft
+              ? state.role === "structuring"
+                ? '<button class="btn btn-primary" id="save-draft-btn">Save in system</button>'
+                : '<button class="btn btn-primary" id="save-draft-btn" disabled>Save in system</button>'
+              : state.role === "structuring"
+                ? '<button class="btn btn-primary" id="save-terms">Save Structuring edits</button>'
+                : '<button class="btn btn-primary" id="save-terms" disabled>Save Structuring edits</button>'
+            : ""
+        }
       </div>
     </section>
   </div>`;
@@ -615,13 +627,21 @@ async function renderContracts() {
       await renderContracts();
     };
     $("#fetch-agreement").onclick = async () => {
-      if (!state.contractExistingClientId || !state.contractExistingAgreementType) return;
+      if (
+        !state.contractExistingClientId ||
+        !state.contractExistingAgreementType
+      )
+        return;
       state.selectedAgreementCheck = true;
-      const agreements = await api(`/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`);
+      const agreements = await api(
+        `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`,
+      );
       state.agreements = agreements;
       state.selectedAgreement = agreements[0]?.id || null;
       if (!state.selectedAgreement) {
-        notify(`No ${state.contractExistingAgreementType} agreement found for this client.`);
+        notify(
+          `No ${state.contractExistingAgreementType} agreement found for this client.`,
+        );
       }
       await renderContracts();
     };
@@ -686,16 +706,23 @@ function renderEvidence(item, field) {
 }
 
 function renderAgreementFacts(agreement) {
+  const clientRecord = state.clients.find(
+    (item) => item.id === agreement.client_id,
+  );
   const client =
-    state.clients.find((item) => item.id === agreement.client_id)?.name ||
-    agreement.client_id;
+    clientRecord?.name || agreement.detected_client_name || agreement.client_id;
+  const profile = agreement.extracted?.parties?.client || clientRecord || {};
   const values = [
     ["Agreement type", agreement.agreement_type],
     ["Client", client],
+    ["Legal entity name", profile.legal_name],
+    ["Entity type", profile.entity_type],
+    ["Formation jurisdiction", profile.formation_jurisdiction],
+    ["Registered address", profile.registered_address],
     ["Version", agreement.version_label],
     ["Effective date", agreement.effective_date],
   ];
-  return `<dl class="agreement-facts">${values.map(([field, value]) => `<div><dt>${field}</dt><dd>${esc(value || "Not found")}</dd></div>`).join("")}</dl>`;
+  return `<dl class="agreement-facts">${values.map(([field, value]) => `<div><dt>${field}</dt><dd>${esc(value || "Not found")}</dd></div>`).join("")}</dl>${profile.source_text ? `<div class="service-edit client-profile-evidence">${renderEvidence(profile, "legal_name")}</div>` : ""}`;
 }
 
 function renderTermsEditor(agreement, isDraft = false) {
@@ -704,6 +731,7 @@ function renderTermsEditor(agreement, isDraft = false) {
   // For drafts, client name and agreement type are editable; other fields are read-only until saved
   const editable = disabled === "" || isDraft; // editing allowed in structuring role OR for drafts
   const clientName =
+    agreement.detected_client_name ||
     state.clients.find((c) => c.id === agreement.client_id)?.name ||
     agreement.client_id;
   const draftClientNameInput = isDraft
@@ -715,19 +743,44 @@ function renderTermsEditor(agreement, isDraft = false) {
 
   if (agreement.agreement_type === "MLA") {
     const lease = extracted.lease || {};
-    return `${renderAgreementFacts(agreement)}<div class="notice">Lease details extracted from this MLA.</div>
-      <div class="three">
-        <div class="control"><label>Lease vehicles</label><input data-key="lease.quantity" type="number" value="${lease.quantity ?? ""}" ${disabled}></div>
-        <div class="control"><label>Monthly rate</label><input data-key="lease.contract_amount" type="number" step="0.01" value="${lease.contract_amount ?? ""}" ${disabled}>${renderEvidence(lease, "contract_amount")}</div>
-        <div class="control"><label>Rate unit</label><input data-key="lease.rate_unit" value="${esc(lease.rate_unit || "")}" ${disabled}>${renderEvidence(lease, "rate_unit")}</div>
-        <div class="control"><label>Lease term (months)</label><input data-key="lease.term_months" type="number" value="${lease.term_months ?? ""}" ${disabled}>${renderEvidence(lease, "term_months")}</div>
-        <div class="control"><label>Billing frequency</label><input data-key="lease.billing_frequency" value="${esc(lease.billing_frequency || "")}" ${disabled}>${renderEvidence(lease, "billing_frequency")}</div>
-        <div class="control"><label>Billing day</label><input data-key="lease.billing_day" value="${esc(lease.billing_day || "")}" ${disabled}>${renderEvidence(lease, "billing_day")}</div>
-        <div class="control"><label>Vehicle make</label><input data-key="lease.vehicle_make" value="${esc(lease.vehicle_make || "")}" ${disabled}>${renderEvidence(lease, "vehicle_make")}</div>
-        <div class="control"><label>Vehicle model</label><input data-key="lease.vehicle_model" value="${esc(lease.vehicle_model || "")}" ${disabled}>${renderEvidence(lease, "vehicle_model")}</div>
-        <div class="control"><label>Engine type</label><input data-key="lease.engine_type" value="${esc(lease.engine_type || "")}" ${disabled}>${renderEvidence(lease, "engine_type")}</div>
-        <div class="control"><label>Pricing basis</label><input data-key="lease.pricing_basis" value="${esc(lease.pricing_basis || "")}" ${disabled}>${renderEvidence(lease, "pricing_basis")}</div>
-      </div>`;
+    const vehicles = lease.vehicles?.length ? lease.vehicles : [lease];
+    const fields = [
+      ["quantity", "Vehicle count", "number"],
+      ["contract_amount", "Monthly rate", "number"],
+      ["rate_unit", "Rate unit", "text"],
+      ["term_months", "Lease term (months)", "number"],
+      ["billing_frequency", "Billing frequency", "text"],
+      ["billing_day", "Billing day", "text"],
+      ["vehicle_make", "Vehicle make", "text"],
+      ["vehicle_model", "Vehicle model", "text"],
+      ["engine_type", "Engine type", "text"],
+      ["pricing_basis", "Currency / basis", "text"],
+    ];
+    return `${renderAgreementFacts(agreement)}<div class="notice">Lease details extracted from this MLA. Each vehicle type keeps its own quantity and rate.</div>
+      ${vehicles
+        .map((vehicle, index) => {
+          const vehicleType =
+            vehicle.vehicle_type ||
+            [
+              vehicle.vehicle_make,
+              vehicle.vehicle_model,
+              vehicle.engine_type && `(${vehicle.engine_type})`,
+            ]
+              .filter(Boolean)
+              .join(" ");
+          const sourceHasBillingFields = vehicle.source_text?.includes("|");
+          return `<div class="service-edit lease-vehicle"><div><b>${esc(vehicleType || `Vehicle ${index + 1}`)}</b><span class="service-rate">${vehicle.contract_amount == null ? "Rate needs review" : `${esc(vehicle.pricing_basis || "USD")} ${Number(vehicle.contract_amount).toFixed(2)}`}</span></div><div class="three">${fields
+            .map(([field, label, type]) => {
+              const fieldDisabled =
+                !sourceHasBillingFields &&
+                ["billing_frequency", "billing_day"].includes(field)
+                  ? "disabled"
+                  : disabled;
+              return `<label class="control"><span class="field-label">${label}</span><input data-lease-field="${index}|${field}" type="${type}" ${field === "contract_amount" ? 'step="0.01"' : type === "number" ? 'step="1"' : ""} value="${esc(vehicle[field] ?? "")}" ${fieldDisabled}>${renderEvidence(vehicle, field)}</label>`;
+            })
+            .join("")}</div></div>`;
+        })
+        .join("")}`;
   }
 
   const services = extracted.services || [];
@@ -805,14 +858,14 @@ async function saveDraft() {
       '[data-draft-field="agreement_type"]',
     );
     const clientName = clientNameInput?.value || agreement.detected_client_name;
+    if (!clientName.trim()) throw new Error("Enter a client name before saving.");
     const agreementType =
       agreementTypeInput?.value || agreement.detected_agreement_type;
-    // Find or create client
-    let client = state.clients.find((c) => c.name === clientName);
-    if (!client) {
-      // For demo, we can't create clients dynamically; pick first match
-      client = state.clients[0];
-    }
+    const client = state.clients.find(
+      (item) => item.name.toLowerCase() === clientName.trim().toLowerCase(),
+    );
+    const clientId = client?.id || agreement.detected_client_id;
+    if (!clientId) throw new Error("Enter a client name before saving.");
     const response = await fetch(
       serviceUrl(`/api/agreements/${agreement.draft_id}/identifiers`),
       {
@@ -822,8 +875,9 @@ async function saveDraft() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          client_id: client.id,
+          client_id: clientId,
           agreement_type: agreementType,
+          client_name: clientName.trim(),
         }),
       },
     );
@@ -833,6 +887,8 @@ async function saveDraft() {
     }
     const saved = await response.json();
     state.uploadedAgreement = saved;
+    state.apiData = await api("/api/bootstrap");
+    state.clients = state.apiData.clients;
     notify("Draft saved in system");
     await renderContracts();
   } catch (err) {
@@ -841,15 +897,26 @@ async function saveDraft() {
 }
 
 async function saveTerms() {
+  let progressToast = null;
   try {
     const agreement = state.agreements.find(
       (item) => item.id === state.selectedAgreement,
     );
+    if (!agreement) throw new Error("Select an agreement before saving.");
     const extracted = structuredClone(agreement.extracted);
 
     if (agreement.agreement_type === "MLA") {
-      const numericFields = ["quantity", "contract_amount", "term_months"];
-      const textFields = [
+      const lease = extracted.lease || {};
+      const vehicles = lease.vehicles?.length ? lease.vehicles : [lease];
+      const numericFields = new Set([
+        "quantity",
+        "contract_amount",
+        "term_months",
+      ]);
+      const fields = [
+        "quantity",
+        "contract_amount",
+        "term_months",
         "rate_unit",
         "billing_frequency",
         "billing_day",
@@ -859,14 +926,24 @@ async function saveTerms() {
         "pricing_basis",
         "effective_from",
       ];
-      for (const key of [...numericFields, ...textFields]) {
-        const input = document.querySelector(`[data-key="lease.${key}"]`);
-        if (!input) continue;
-        if (numericFields.includes(key))
-          extracted.lease[key] =
-            input.value === "" ? null : Number(input.value);
-        else extracted.lease[key] = input.value;
+      vehicles.forEach((vehicle, index) => {
+        for (const key of fields) {
+          const input = document.querySelector(
+            `[data-lease-field="${index}|${key}"]`,
+          );
+          if (!input) continue;
+          vehicle[key] = numericFields.has(key)
+            ? input.value === ""
+              ? null
+              : Number(input.value)
+            : input.value;
+        }
+      });
+      if (vehicles.length) {
+        Object.assign(lease, vehicles[0]);
+        lease.vehicles = vehicles;
       }
+      extracted.lease = lease;
     } else {
       extracted.services.forEach((service, index) => {
         const included = document.querySelector(`[data-service="${index}"]`);
@@ -907,32 +984,38 @@ async function saveTerms() {
     const comment = prompt("Enter update comment for audit trail:");
     if (!comment) return;
 
-    // Show regeneration progress to user
-    const progressToast = document.createElement("div");
+    // Keep progress visible while the original PDF is patched and re-extracted.
+    clearEvidenceHighlight();
+    progressToast = document.createElement("div");
     progressToast.className = "toast show";
     progressToast.style.cssText = "background:#2a3a3a; z-index:10000;";
-    progressToast.innerHTML = `<b>PDF regeneration in progress</b><br><span class="small">Updating extracted terms and regenerating the PDF document...</span>`;
+    progressToast.innerHTML = `<b>Saving agreement version</b><br><span class="small">Updating changed fields in the original PDF and refreshing evidence...</span>`;
     document.body.appendChild(progressToast);
 
     try {
-      // Save creates a NEW version; backend regenerates PDF from extracted terms
+      // Save creates a new version while retaining the original document layout.
       const saved = await api(`/api/agreements/${agreement.id}/save-version`, {
         method: "PUT",
         body: JSON.stringify({ extracted, update_comment: comment }),
       });
 
-      // Update state to the new version so the PDF loads the regenerated version
+      // Load the newly saved PDF so evidence uses the current version.
       state.selectedAgreement = saved.id;
       // Refresh the agreements list to include the new version
-      if (state.contractExistingClientId && state.contractExistingAgreementType) {
+      if (
+        state.contractExistingClientId &&
+        state.contractExistingAgreementType
+      ) {
         state.agreements = await api(
-          `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`
+          `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`,
         );
       }
 
       // Remove progress toast
       document.body.removeChild(progressToast);
-      notify("New version saved with audit comment; PDF regenerated");
+      notify(
+        "New version saved with audit comment; original PDF layout preserved",
+      );
       await renderContracts();
     } catch (error) {
       // Remove progress toast on error
@@ -1096,35 +1179,41 @@ async function loadDraftFromContracts() {
       }
 
       const lease = extracted.lease;
-      if (lease) {
-        if (lease.contract_amount == null) {
+      for (const vehicle of lease?.vehicles || (lease ? [lease] : [])) {
+        if (vehicle.contract_amount == null) {
           missingRates += 1;
-        } else {
-          rows.push({
-            agreement_id: agreement.id,
-            billing_stream: "LEASE",
-            service_code: lease.service_code,
-            service_name: lease.service_name,
-            component_code: lease.component_name,
-            component_name: "Monthly Lease",
-            charge_type: "recurring",
-            amount: Number(lease.contract_amount),
-            currency: "USD",
-            rate_unit: lease.rate_unit || "vehicle_month",
-            quantity: Number(lease.quantity ?? 1),
-            billing_frequency: "monthly",
-            billing_day: "1",
-            effective_from: agreement.effective_date,
-            terms: {
-              source_page: lease.evidence_page || 1,
-              term_months: lease.term_months,
-              vehicle_make: lease.vehicle_make,
-              vehicle_model: lease.vehicle_model,
-              engine_type: lease.engine_type,
-              pricing_basis: lease.pricing_basis,
-            },
-          });
+          continue;
         }
+        const vehicleType =
+          vehicle.vehicle_type ||
+          [vehicle.vehicle_make, vehicle.vehicle_model]
+            .filter(Boolean)
+            .join(" ");
+        rows.push({
+          agreement_id: agreement.id,
+          billing_stream: "LEASE",
+          service_code: vehicle.service_code,
+          service_name: vehicle.service_name,
+          component_code: vehicle.service_code || vehicle.component_name,
+          component_name: `Monthly Lease - ${vehicleType || "Vehicle"}`,
+          charge_type: "recurring",
+          amount: Number(vehicle.contract_amount),
+          currency: vehicle.pricing_basis || "USD",
+          rate_unit: vehicle.rate_unit || "vehicle_month",
+          quantity: Number(vehicle.quantity ?? 1),
+          billing_frequency: vehicle.billing_frequency || "monthly",
+          billing_day: vehicle.billing_day || "1",
+          effective_from: vehicle.effective_from || agreement.effective_date,
+          terms: {
+            source_page: vehicle.evidence_page || 1,
+            term_months: vehicle.term_months,
+            vehicle_type: vehicleType,
+            vehicle_make: vehicle.vehicle_make,
+            vehicle_model: vehicle.vehicle_model,
+            engine_type: vehicle.engine_type,
+            pricing_basis: vehicle.pricing_basis,
+          },
+        });
       }
     }
 

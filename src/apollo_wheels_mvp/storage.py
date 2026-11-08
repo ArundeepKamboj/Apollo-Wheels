@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import os
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +40,46 @@ _AGREEMENT_MIGRATIONS = [
     ("update_comment", "TEXT"),
 ]
 
+_CLIENT_MIGRATIONS = [
+    ("legal_name", "TEXT"),
+    ("entity_type", "TEXT"),
+    ("formation_jurisdiction", "TEXT"),
+    ("registered_address", "TEXT"),
+]
+
+
+def _migrate_clients(db: sqlite3.Connection) -> None:
+    columns = {row[1] for row in db.execute("PRAGMA table_info(clients)").fetchall()}
+    for name, definition in _CLIENT_MIGRATIONS:
+        if name not in columns:
+            db.execute(f"ALTER TABLE clients ADD COLUMN {name} {definition}")
+
+
+def update_client_profile(db: sqlite3.Connection, client_id: str, profile: object) -> None:
+    """Store parsed legal identity details only when they match the selected client."""
+    if not isinstance(profile, dict):
+        return
+    legal_name = str(profile.get("legal_name") or "").strip()
+    if not legal_name:
+        return
+    client = db.execute("SELECT name FROM clients WHERE id=?", (client_id,)).fetchone()
+    if client is None:
+        return
+    normalize = lambda value: re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+    display_name = normalize(client["name"])
+    normalized_legal_name = normalize(legal_name)
+    if display_name not in normalized_legal_name and normalized_legal_name not in display_name:
+        return
+    db.execute(
+        """UPDATE clients SET legal_name=COALESCE(NULLIF(?, ''), legal_name),
+           entity_type=COALESCE(NULLIF(?, ''), entity_type),
+           formation_jurisdiction=COALESCE(NULLIF(?, ''), formation_jurisdiction),
+           registered_address=COALESCE(NULLIF(?, ''), registered_address) WHERE id=?""",
+        (legal_name, str(profile.get("entity_type") or ""),
+         str(profile.get("formation_jurisdiction") or ""),
+         str(profile.get("registered_address") or ""), client_id),
+    )
+
 
 def _migrate_agreements(db: sqlite3.Connection) -> None:
     """Add versioning columns to pre-existing agreements tables.
@@ -60,6 +101,10 @@ def initialize() -> None:
             CREATE TABLE IF NOT EXISTS clients (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
+                legal_name TEXT,
+                entity_type TEXT,
+                formation_jurisdiction TEXT,
+                registered_address TEXT,
                 include_history_on_invoice INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -182,4 +227,5 @@ def initialize() -> None:
 
             """
         )
+        _migrate_clients(db)
         _migrate_agreements(db)

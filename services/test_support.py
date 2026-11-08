@@ -36,8 +36,8 @@ def run_upload(coroutine):
     raise AssertionError("The in-memory upload coroutine unexpectedly performed asynchronous I/O.")
 
 
-def setup_demo(test_case):
-    """Point all services at a disposable database and seed known demo rows."""
+def setup_demo(test_case, include_workflow_history=True):
+    """Point services at a disposable DB and optionally seed workflow fixtures."""
     data_root = PROJECT_ROOT / "data"
     data_root.mkdir(exist_ok=True)
     folder = tempfile.TemporaryDirectory(dir=data_root)
@@ -64,5 +64,5 @@ def setup_demo(test_case):
         test_case.addCleanup(setattr, module, name, original)
 
     storage.initialize()
-    seed.seed_demo_data()
+    seed.seed_demo_data(include_workflow_history=include_workflow_history)
     return root

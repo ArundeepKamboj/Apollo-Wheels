@@ -18,7 +18,7 @@ colorlinks: false
 > and related mobility services. It is designed for use when reviewing
 > or preparing agreements in a Wheels, Inc.-type business context.
 >
-> **Source basis.** The uploaded 14-page *Logistics Services Agreement*
+> **Source basis.** The uploaded 14-page _Logistics Services Agreement_
 > is the structural reference for this template. It contains provisions
 > on parties and recitals; services and covered products; service
 > locations; rates, invoices and disputes; service standards; ownership
@@ -46,7 +46,7 @@ colorlinks: false
 > the relevant Wheels commercial, operations, risk, tax, insurance and
 > information-security stakeholders approve each document.
 
-------------------------------------------------------------------------
+---
 
 # 1. How to use this template
 
@@ -76,20 +76,20 @@ The source agreement is a logistics services agreement. It is useful as
 a model for contract structure and several general commercial
 mechanisms:
 
--   defined service scope and schedules;
--   treatment of existing and future products;
--   designated service/distribution facilities;
--   monthly invoicing and detailed invoice-dispute mechanics;
--   general service standards and advance notice of material changes;
--   customer ownership of products held by the service provider;
--   reporting, audit access and recurring review meetings;
--   operational policies for shortages, damages, claims and
-    investigations;
--   compliance with laws and insurance;
--   reciprocal indemnities, liability limitations and waiver of
-    subrogation;
--   confidentiality, term, termination, force majeure and boilerplate
-    clauses.
+- defined service scope and schedules;
+- treatment of existing and future products;
+- designated service/distribution facilities;
+- monthly invoicing and detailed invoice-dispute mechanics;
+- general service standards and advance notice of material changes;
+- customer ownership of products held by the service provider;
+- reporting, audit access and recurring review meetings;
+- operational policies for shortages, damages, claims and
+  investigations;
+- compliance with laws and insurance;
+- reciprocal indemnities, liability limitations and waiver of
+  subrogation;
+- confidentiality, term, termination, force majeure and boilerplate
+  clauses.
 
 It does **not** establish how Wheels prices or delivers fleet services,
 who owns or leases vehicles in a particular Wheels transaction, how
@@ -102,89 +102,95 @@ approved business positions.
 
 Select only what applies to the transaction.
 
-  -----------------------------------------------------------------------
-  Module                              Typical subject matter to define
-  ----------------------------------- -----------------------------------
-  Fleet consulting and policy         Fleet strategy, vehicle policy,
-                                      driver eligibility,
-                                      total-cost-of-ownership analysis
+---
 
-  Vehicle sourcing and ordering       Approved makes/models,
-                                      configuration, ordering, delivery,
-                                      substitutions, lead times
+Module Typical subject matter to define
 
-  Vehicle leasing / funding           Lessee, lessor, term, rentals,
-                                      deposits, residual value, early
-                                      termination
+---
 
-  Registration and licensing          Title, registration, plates,
-                                      permits, taxes and renewals
+Fleet consulting and policy Fleet strategy, vehicle policy,
+driver eligibility,
+total-cost-of-ownership analysis
 
-  Maintenance and repairs             Preventive maintenance, repair
-                                      authorisation, network, pricing,
-                                      warranty and downtime
+Vehicle sourcing and ordering Approved makes/models,
+configuration, ordering, delivery,
+substitutions, lead times
 
-  Tyres and roadside assistance       Replacement rules, emergency
-                                      response, coverage area, service
-                                      hours
+Vehicle leasing / funding Lessee, lessor, term, rentals,
+deposits, residual value, early
+termination
 
-  Fuel and charging                   Fuel cards, charging accounts,
-                                      transaction controls, fraud,
-                                      reconciliation
+Registration and licensing Title, registration, plates,
+permits, taxes and renewals
 
-  Accident and claims management      Reporting, towing, repair, insurer
-                                      coordination, liability and claims
-                                      support
+Maintenance and repairs Preventive maintenance, repair
+authorisation, network, pricing,
+warranty and downtime
 
-  Driver services                     Driver communications, eligibility,
-                                      onboarding, safety and support
+Tyres and roadside assistance Replacement rules, emergency
+response, coverage area, service
+hours
 
-  Telematics and fleet data           Devices, location data,
-                                      diagnostics, usage, retention,
-                                      access and permitted analytics
+Fuel and charging Fuel cards, charging accounts,
+transaction controls, fraud,
+reconciliation
 
-  Replacement / rental vehicles       Eligibility, duration, cost
-                                      allocation, availability and return
+Accident and claims management Reporting, towing, repair, insurer
+coordination, liability and claims
+support
 
-  Vehicle remarketing / disposal      End-of-lease inspection, sale,
-                                      proceeds, condition standards,
-                                      title transfer
+Driver services Driver communications, eligibility,
+onboarding, safety and support
 
-  Reporting and analytics             Fleet dashboards, utilisation,
-                                      spend, exceptions, emissions and
-                                      savings
+Telematics and fleet data Devices, location data,
+diagnostics, usage, retention,
+access and permitted analytics
 
-  Electric vehicle services           Charging infrastructure, battery
-                                      condition, incentives, range,
-                                      charging data
+Replacement / rental vehicles Eligibility, duration, cost
+allocation, availability and return
 
-  Transition and exit                 Data migration, vehicle handover,
-                                      open work orders, supplier transfer
-                                      and continuity
-  -----------------------------------------------------------------------
+Vehicle remarketing / disposal End-of-lease inspection, sale,
+proceeds, condition standards,
+title transfer
 
-------------------------------------------------------------------------
+Reporting and analytics Fleet dashboards, utilisation,
+spend, exceptions, emissions and
+savings
+
+Electric vehicle services Charging infrastructure, battery
+condition, incentives, range,
+charging data
+
+Transition and exit Data migration, vehicle handover,
+open work orders, supplier transfer
+and continuity
+
+---
+
+---
 
 # 2. Document control and transaction particulars
 
-  Field                               Insert transaction-specific value
-  ----------------------------------- ---------------------------------------
-  Agreement title                     `{{MASTER_SERVICES_AGREEMENT_TITLE}}`
-  Agreement reference                 `{{CONTRACT_ID}}`
-  Version / date                      `{{VERSION_AND_DATE}}`
-  Customer legal entity               `{{CUSTOMER_LEGAL_NAME}}`
-  Provider legal entity               `{{PROVIDER_LEGAL_NAME}}`
-  Effective Date                      `{{EFFECTIVE_DATE}}`
-  Initial service commencement date   `{{SERVICE_COMMENCEMENT_DATE}}`
-  Initial term end date (if fixed)    `{{INITIAL_TERM_END_DATE}}`
-  Primary country / jurisdiction      `{{COUNTRY_AND_JURISDICTION}}`
-  Fleet size at commencement          `{{INITIAL_FLEET_COUNT}}`
-  Covered vehicle classes             `{{VEHICLE_CLASSES}}`
-  Covered operating territories       `{{COUNTRIES_STATES_REGIONS}}`
-  Contract owner                      `{{BUSINESS_OWNER}}`
-  Legal reviewer                      `{{LEGAL_REVIEWER}}`
-  Commercial approver                 `{{COMMERCIAL_APPROVER}}`
-  Operations approver                 `{{OPERATIONS_APPROVER}}`
+Field Insert transaction-specific value
+
+---
+
+Agreement title `{{MASTER_SERVICES_AGREEMENT_TITLE}}`
+Agreement reference `{{CONTRACT_ID}}`
+Version / date `{{VERSION_AND_DATE}}`
+Customer legal entity `{{CUSTOMER_LEGAL_NAME}}`
+Provider legal entity `{{PROVIDER_LEGAL_NAME}}`
+Effective Date `{{EFFECTIVE_DATE}}`
+Initial service commencement date `{{SERVICE_COMMENCEMENT_DATE}}`
+Initial term end date (if fixed) `{{INITIAL_TERM_END_DATE}}`
+Primary country / jurisdiction `{{COUNTRY_AND_JURISDICTION}}`
+Fleet size at commencement `{{INITIAL_FLEET_COUNT}}`
+Covered vehicle classes `{{VEHICLE_CLASSES}}`
+Covered operating territories `{{COUNTRIES_STATES_REGIONS}}`
+Contract owner `{{BUSINESS_OWNER}}`
+Legal reviewer `{{LEGAL_REVIEWER}}`
+Commercial approver `{{COMMERCIAL_APPROVER}}`
+Operations approver `{{OPERATIONS_APPROVER}}`
 
 **Why these fields matter:** They provide a reliable contract identity,
 distinguish signing from service commencement, and expose the scale and
@@ -192,7 +198,7 @@ geographic footprint of the arrangement. Fleet count, vehicle class and
 territory can materially affect pricing, service capacity, insurance and
 regulatory requirements.
 
-------------------------------------------------------------------------
+---
 
 # 3. Master Services Agreement --- drafting template
 
@@ -201,11 +207,11 @@ regulatory requirements.
 This Master Services Agreement (the **"Agreement"**) is entered into on
 `{{AGREEMENT_DATE}}` (the **"Effective Date"**) by and between:
 
-1.  **`{{CUSTOMER_LEGAL_NAME}}`**, a `{{ENTITY_TYPE}}` organised under
-    the laws of `{{PLACE_OF_FORMATION}}`, with its registered office at
+1.  **`{{CUSTOMER_LEGAL_NAME}}`**, a `{{CUSTOMER_ENTITY_TYPE}}` organised under
+    the laws of `{{CUSTOMER_PLACE_OF_FORMATION}}`, with its registered office at
     `{{CUSTOMER_REGISTERED_ADDRESS}}` (**"Customer"**); and
-2.  **`{{PROVIDER_LEGAL_NAME}}`**, a `{{ENTITY_TYPE}}` organised under
-    the laws of `{{PLACE_OF_FORMATION}}`, with its registered office at
+2.  **`{{PROVIDER_LEGAL_NAME}}`**, a `{{PROVIDER_ENTITY_TYPE}}` organised under
+    the laws of `{{PROVIDER_PLACE_OF_FORMATION}}`, with its registered office at
     `{{PROVIDER_REGISTERED_ADDRESS}}` (**"Provider"**).
 
 Customer and Provider are each a **"Party"** and together the
@@ -213,23 +219,23 @@ Customer and Provider are each a **"Party"** and together the
 
 ### Field guide --- parties
 
--   **Full legal entity name:** The contract must bind the correct legal
-    entity, not merely a brand, trade name, parent company or business
-    division.
--   **Entity type and formation jurisdiction:** Identifies the legal
-    form and place of incorporation/organisation.
--   **Registered office:** Supports formal notices and legal
-    identification.
--   **Correct Wheels entity:** Do not assume that "Wheels, Inc." is the
-    correct provider or lessor for every transaction. Verify the legal
-    entity named in the proposal, order documents, invoices, vehicle
-    title/lease documents and signature authority. A parent, affiliate,
-    special-purpose entity, lessor, servicing entity or subcontractor
-    may have a different role.
--   **Customer entity:** Verify which customer affiliate is responsible
-    for payment, vehicle use, driver obligations, insurance and
-    indemnities. If several affiliates participate, use a clear
-    affiliate accession or multi-entity structure.
+- **Full legal entity name:** The contract must bind the correct legal
+  entity, not merely a brand, trade name, parent company or business
+  division.
+- **Entity type and formation jurisdiction:** Identifies the legal
+  form and place of incorporation/organisation.
+- **Registered office:** Supports formal notices and legal
+  identification.
+- **Correct Wheels entity:** Do not assume that "Wheels, Inc." is the
+  correct provider or lessor for every transaction. Verify the legal
+  entity named in the proposal, order documents, invoices, vehicle
+  title/lease documents and signature authority. A parent, affiliate,
+  special-purpose entity, lessor, servicing entity or subcontractor
+  may have a different role.
+- **Customer entity:** Verify which customer affiliate is responsible
+  for payment, vehicle use, driver obligations, insurance and
+  indemnities. If several affiliates participate, use a clear
+  affiliate accession or multi-entity structure.
 
 ## RECITALS
 
@@ -254,7 +260,7 @@ explain the transaction. They should not contain the only statement of a
 binding service obligation; operative commitments belong in the clauses
 and schedules.
 
-------------------------------------------------------------------------
+---
 
 ## Section 1. Definitions and interpretation
 
@@ -262,35 +268,35 @@ and schedules.
 
 In this Agreement, unless the context requires otherwise:
 
--   **"Affiliate"** means an entity that controls, is controlled by, or
-    is under common control with a Party, where control means
-    `{{CONTROL_DEFINITION}}`.
--   **"Business Day"** means a day other than
-    `{{WEEKEND_AND_PUBLIC_HOLIDAY_DEFINITION}}` in
-    `{{RELEVANT_LOCATION}}`.
--   **"Confidential Information"** has the meaning in Section 11.
--   **"Driver"** means an individual authorised by Customer to operate a
-    Covered Vehicle.
--   **"Covered Vehicle"** means a vehicle included in the fleet and
-    scope under Schedule 1 or a subsequently approved vehicle order.
--   **"Fleet Data"** means data relating to vehicles, drivers, vehicle
-    use, transactions, maintenance, fuel/charging, claims or fleet
-    performance, as further described in Schedule 9.
--   **"Fees"** means the fees, rentals, charges and other amounts
-    payable under this Agreement and Schedule 5.
--   **"Services"** means the services expressly described in this
-    Agreement, each SOW and the Schedules.
--   **"Service Levels"** means the performance standards and measurement
-    rules in Schedule 6.
--   **"Supplier"** means a third party engaged by a Party to provide
-    goods or services in connection with the Services.
--   **"Statement of Work" or "SOW"** means a document signed by both
-    Parties that describes a specific project, service, scope, fee or
-    implementation.
--   **"Vehicle Costs"** means vehicle acquisition, lease, financing,
-    registration, maintenance, repair, tyres, fuel, charging, insurance,
-    taxes, tolls, fines, disposal and other costs allocated under
-    Schedule 5.
+- **"Affiliate"** means an entity that controls, is controlled by, or
+  is under common control with a Party, where control means
+  `{{CONTROL_DEFINITION}}`.
+- **"Business Day"** means a day other than
+  `{{WEEKEND_AND_PUBLIC_HOLIDAY_DEFINITION}}` in
+  `{{RELEVANT_LOCATION}}`.
+- **"Confidential Information"** has the meaning in Section 11.
+- **"Driver"** means an individual authorised by Customer to operate a
+  Covered Vehicle.
+- **"Covered Vehicle"** means a vehicle included in the fleet and
+  scope under Schedule 1 or a subsequently approved vehicle order.
+- **"Fleet Data"** means data relating to vehicles, drivers, vehicle
+  use, transactions, maintenance, fuel/charging, claims or fleet
+  performance, as further described in Schedule 9.
+- **"Fees"** means the fees, rentals, charges and other amounts
+  payable under this Agreement and Schedule 5.
+- **"Services"** means the services expressly described in this
+  Agreement, each SOW and the Schedules.
+- **"Service Levels"** means the performance standards and measurement
+  rules in Schedule 6.
+- **"Supplier"** means a third party engaged by a Party to provide
+  goods or services in connection with the Services.
+- **"Statement of Work" or "SOW"** means a document signed by both
+  Parties that describes a specific project, service, scope, fee or
+  implementation.
+- **"Vehicle Costs"** means vehicle acquisition, lease, financing,
+  registration, maintenance, repair, tyres, fuel, charging, insurance,
+  taxes, tolls, fines, disposal and other costs allocated under
+  Schedule 5.
 
 Add transaction-specific definitions: `{{ADDITIONAL_DEFINITIONS}}`.
 
@@ -307,8 +313,8 @@ Definitions prevent the same term being interpreted differently across
 legal, operations, finance and fleet teams. Define terms that affect
 money, responsibility, service measurement, vehicle custody or risk.
 Avoid defining ordinary words unnecessarily. In a fleet agreement, the
-terms *vehicle owner*, *registered keeper*, *lessee*, *customer*,
-*driver*, *fleet administrator* and *service provider* must not be used
+terms _vehicle owner_, _registered keeper_, _lessee_, _customer_,
+_driver_, _fleet administrator_ and _service provider_ must not be used
 interchangeably unless their meanings are genuinely the same.
 
 ## Section 2. Services and scope
@@ -321,18 +327,18 @@ subject to the terms of this Agreement.
 
 The selected Services are:
 
--   `{{FLEET_CONSULTING_AND_POLICY_SERVICES}}`;
--   `{{VEHICLE_SOURCING_ORDERING_AND_DELIVERY}}`;
--   `{{LEASING_OR_FUNDING_SERVICES}}`;
--   `{{REGISTRATION_AND_LICENSING_SERVICES}}`;
--   `{{MAINTENANCE_REPAIR_AND_TYRE_SERVICES}}`;
--   `{{FUEL_AND_CHARGING_SERVICES}}`;
--   `{{ACCIDENT_AND_CLAIMS_SERVICES}}`;
--   `{{DRIVER_SUPPORT_AND_REPLACEMENT_VEHICLE_SERVICES}}`;
--   `{{TELEMATICS_AND_DATA_SERVICES}}`;
--   `{{REMARKETING_AND_DISPOSAL_SERVICES}}`;
--   `{{REPORTING_AND_ANALYTICS_SERVICES}}`; and
--   `{{OTHER_SERVICES}}`.
+- `{{FLEET_CONSULTING_AND_POLICY_SERVICES}}`;
+- `{{VEHICLE_SOURCING_ORDERING_AND_DELIVERY}}`;
+- `{{LEASING_OR_FUNDING_SERVICES}}`;
+- `{{REGISTRATION_AND_LICENSING_SERVICES}}`;
+- `{{MAINTENANCE_REPAIR_AND_TYRE_SERVICES}}`;
+- `{{FUEL_AND_CHARGING_SERVICES}}`;
+- `{{ACCIDENT_AND_CLAIMS_SERVICES}}`;
+- `{{DRIVER_SUPPORT_AND_REPLACEMENT_VEHICLE_SERVICES}}`;
+- `{{TELEMATICS_AND_DATA_SERVICES}}`;
+- `{{REMARKETING_AND_DISPOSAL_SERVICES}}`;
+- `{{REPORTING_AND_ANALYTICS_SERVICES}}`; and
+- `{{OTHER_SERVICES}}`.
 
 The detailed scope, exclusions, deliverables, assumptions and
 dependencies are set out in Schedule 1 and the relevant SOW.
@@ -400,18 +406,18 @@ related charges shall be handled under `{{ORDER_CANCELLATION_RULES}}`.
 For each vehicle, the Parties shall identify the legal and commercial
 structure:
 
--   vehicle owner / title holder: `{{ENTITY}}`;
--   lessor / finance provider: `{{ENTITY}}`;
--   lessee: `{{ENTITY}}`;
--   fleet manager / administrator: `{{ENTITY}}`;
--   permitted users / Drivers: `{{DEFINED_GROUP}}`;
--   lease commencement trigger:
-    `{{DELIVERY_ACCEPTANCE_OR_OTHER_EVENT}}`;
--   lease term: `{{MONTHS}}`;
--   annual mileage allowance: `{{MILEAGE}}`;
--   base rental and included services: `{{PRICE_AND_INCLUSIONS}}`;
--   residual value risk bearer: `{{PARTY}}`;
--   end-of-term process: `{{PROCESS}}`.
+- vehicle owner / title holder: `{{ENTITY}}`;
+- lessor / finance provider: `{{ENTITY}}`;
+- lessee: `{{ENTITY}}`;
+- fleet manager / administrator: `{{ENTITY}}`;
+- permitted users / Drivers: `{{DEFINED_GROUP}}`;
+- lease commencement trigger:
+  `{{DELIVERY_ACCEPTANCE_OR_OTHER_EVENT}}`;
+- lease term: `{{MONTHS}}`;
+- annual mileage allowance: `{{MILEAGE}}`;
+- base rental and included services: `{{PRICE_AND_INCLUSIONS}}`;
+- residual value risk bearer: `{{PARTY}}`;
+- end-of-term process: `{{PROCESS}}`.
 
 The detailed financial and legal terms for any lease or financing
 arrangement shall be set out in
@@ -440,8 +446,8 @@ cannot lawfully be waived.
 
 ### Field guide --- vehicle legal structure
 
-Do not treat the words *fleet manager*, *lessor*, *owner* and *service
-provider* as synonyms. In some arrangements a fleet manager administers
+Do not treat the words _fleet manager_, _lessor_, _owner_ and _service
+provider_ as synonyms. In some arrangements a fleet manager administers
 vehicles owned or funded by another entity; in others an affiliated
 entity or third-party finance company may be the lessor. The actual
 documents determine the structure. This distinction drives title,
@@ -887,36 +893,40 @@ rules depend on the country and the legal role of each entity.
 Each Party shall maintain the insurance it is legally required to
 maintain and the policies and minimum limits set out below.
 
-  ------------------------------------------------------------------------
-  Insurance        Party                    Minimum limit Key terms /
-                   responsible                            evidence
-  ---------------- ---------------- --------------------- ----------------
-  Commercial       `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  general                                                 
-  liability                                               
+---
 
-  Auto / motor     `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  liability                                               
+Insurance Party Minimum limit Key terms /
+responsible evidence
 
-  Physical damage  `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  / comprehensive                                         
-  vehicle cover                                           
+---
 
-  Professional     `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  indemnity /                                             
-  errors and                                              
-  omissions                                               
+Commercial `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+general  
+ liability
 
-  Cyber / privacy  `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  liability                                               
+Auto / motor `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+liability
 
-  Workers'         `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  compensation /                                          
-  employer                                                
-  liability                                               
+Physical damage `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+/ comprehensive  
+ vehicle cover
 
-  Other            `{{PARTY}}`               `{{AMOUNT}}` `{{TERMS}}`
-  ------------------------------------------------------------------------
+Professional `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+indemnity /  
+ errors and  
+ omissions
+
+Cyber / privacy `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+liability
+
+Workers' `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+compensation /  
+ employer  
+ liability
+
+Other `{{PARTY}}` `{{AMOUNT}}` `{{TERMS}}`
+
+---
 
 A Party shall provide reasonable evidence of required coverage on
 request and notify the other Party of cancellation or material reduction
@@ -968,13 +978,15 @@ arising out of or in connection with this Agreement shall not exceed
 
 The following liabilities shall be subject to separate caps, if agreed:
 
-  Risk category                             Cap Period / calculation
-  --------------------------------- ----------- ----------------------
-  Data protection / cybersecurity     `{{CAP}}` `{{PERIOD}}`
-  Confidentiality                     `{{CAP}}` `{{PERIOD}}`
-  Intellectual property               `{{CAP}}` `{{PERIOD}}`
-  Vehicle damage / custody            `{{CAP}}` `{{PERIOD}}`
-  Other                               `{{CAP}}` `{{PERIOD}}`
+Risk category Cap Period / calculation
+
+---
+
+Data protection / cybersecurity `{{CAP}}` `{{PERIOD}}`
+Confidentiality `{{CAP}}` `{{PERIOD}}`
+Intellectual property `{{CAP}}` `{{PERIOD}}`
+Vehicle damage / custody `{{CAP}}` `{{PERIOD}}`
+Other `{{CAP}}` `{{PERIOD}}`
 
 ### 16.3 Excluded loss
 
@@ -1306,7 +1318,7 @@ located. Mandatory local law may apply regardless of the chosen
 governing law. Obtain counsel's advice on enforceability and dispute
 strategy.
 
-------------------------------------------------------------------------
+---
 
 # 4. Signature blocks
 
@@ -1332,7 +1344,7 @@ the individuals signing for them. Confirm authority, correct entity
 names, execution formalities, counterpart requirements and
 electronic-signature validity.
 
-------------------------------------------------------------------------
+---
 
 # 5. Recommended schedules
 
@@ -1342,39 +1354,43 @@ incorporated into the MSA.
 
 ## Schedule 1 --- Services, scope and exclusions
 
-  -----------------------------------------------------------------------
-  Field                   What to record          Why it matters
-  ----------------------- ----------------------- -----------------------
-  Service name            `{{SERVICE_NAME}}`      Identifies the
-                                                  purchased service
+---
 
-  Description             `{{DETAILED_SCOPE}}`    Makes the promise
-                                                  measurable
+Field What to record Why it matters
 
-  Included activities     `{{INCLUSIONS}}`        Prevents scope
-                                                  ambiguity
+---
 
-  Excluded activities     `{{EXCLUSIONS}}`        Prevents accidental
-                                                  obligations
+Service name `{{SERVICE_NAME}}` Identifies the
+purchased service
 
-  Service locations       `{{LOCATIONS}}`         Defines geographic
-                                                  coverage
+Description `{{DETAILED_SCOPE}}` Makes the promise
+measurable
 
-  Operating hours         `{{HOURS}}`             Sets availability
-                                                  expectations
+Included activities `{{INCLUSIONS}}` Prevents scope
+ambiguity
 
-  Volumes / assumptions   `{{VOLUMES}}`           Supports capacity and
-                                                  pricing
+Excluded activities `{{EXCLUSIONS}}` Prevents accidental
+obligations
 
-  Dependencies            `{{DEPENDENCIES}}`      Identifies what
-                                                  Customer or third
-                                                  parties must provide
+Service locations `{{LOCATIONS}}` Defines geographic
+coverage
 
-  Deliverables            `{{DELIVERABLES}}`      Defines completion and
-                                                  acceptance
+Operating hours `{{HOURS}}` Sets availability
+expectations
 
-  Service owner           `{{OWNER}}`             Assigns accountability
-  -----------------------------------------------------------------------
+Volumes / assumptions `{{VOLUMES}}` Supports capacity and
+pricing
+
+Dependencies `{{DEPENDENCIES}}` Identifies what
+Customer or third
+parties must provide
+
+Deliverables `{{DELIVERABLES}}` Defines completion and
+acceptance
+
+Service owner `{{OWNER}}` Assigns accountability
+
+---
 
 ## Schedule 2 --- Fleet and vehicle population
 
@@ -1426,18 +1442,20 @@ material or complicated charges.
 
 For every metric record:
 
-  Field                  Required detail
-  ---------------------- ------------------------
-  Metric                 `{{NAME}}`
-  Definition / formula   `{{FORMULA}}`
-  Data source            `{{SYSTEM_OR_REPORT}}`
-  Measurement period     `{{PERIOD}}`
-  Target                 `{{TARGET}}`
-  Exclusions             `{{EXCLUSIONS}}`
-  Reporting date         `{{DEADLINE}}`
-  Escalation threshold   `{{THRESHOLD}}`
-  Remedy / credit        `{{REMEDY}}`
-  Credit cap             `{{CAP}}`
+Field Required detail
+
+---
+
+Metric `{{NAME}}`
+Definition / formula `{{FORMULA}}`
+Data source `{{SYSTEM_OR_REPORT}}`
+Measurement period `{{PERIOD}}`
+Target `{{TARGET}}`
+Exclusions `{{EXCLUSIONS}}`
+Reporting date `{{DEADLINE}}`
+Escalation threshold `{{THRESHOLD}}`
+Remedy / credit `{{REMEDY}}`
+Credit cap `{{CAP}}`
 
 Potential metrics include order cycle time, delivery on-time rate,
 repair authorisation time, vehicle downtime, roadside response, driver
@@ -1483,47 +1501,51 @@ that data explicit.
 
 Use R = Responsible, A = Accountable, C = Consulted, I = Informed.
 
-  ---------------------------------------------------------------------------------
-  Activity         Customer     Provider     Lessor /     Supplier     Driver
-                                             funder                    
-  ---------------- ------------ ------------ ------------ ------------ ------------
-  Vehicle policy   `{{RACI}}`   `{{RACI}}`   `{{RACI}}`   `{{RACI}}`   `{{RACI}}`
+---
 
-  Vehicle                                                              
-  selection                                                            
+Activity Customer Provider Lessor / Supplier Driver
+funder
 
-  Order approval                                                       
+---
 
-  Registration                                                         
+Vehicle policy `{{RACI}}` `{{RACI}}` `{{RACI}}` `{{RACI}}` `{{RACI}}`
 
-  Maintenance                                                          
-  approval                                                             
+Vehicle  
+ selection
 
-  Repair                                                               
-  performance                                                          
+Order approval
 
-  Fuel / charging                                                      
-  control                                                              
+Registration
 
-  Accident                                                             
-  reporting                                                            
+Maintenance  
+ approval
 
-  Insurance claim                                                      
+Repair  
+ performance
 
-  Fine / toll                                                          
-  handling                                                             
+Fuel / charging  
+ control
 
-  Vehicle return                                                       
+Accident  
+ reporting
 
-  Remarketing /                                                        
-  sale                                                                 
+Insurance claim
 
-  Invoice                                                              
-  reconciliation                                                       
+Fine / toll  
+ handling
 
-  Data privacy                                                         
-  notices                                                              
-  ---------------------------------------------------------------------------------
+Vehicle return
+
+Remarketing /  
+ sale
+
+Invoice  
+ reconciliation
+
+Data privacy  
+ notices
+
+---
 
 **Why needed:** Exposes responsibility gaps and prevents multiple
 parties from assuming another party owns a task.
@@ -1538,7 +1560,7 @@ parallel run, cutover, exit support, data return and supplier handover.
 This schedule turns the intended operating model into a deliverable
 plan.
 
-------------------------------------------------------------------------
+---
 
 # 6. Commercial and legal review checklist
 
@@ -1546,71 +1568,71 @@ Use this checklist before approving or signing an MSA.
 
 ## A. Contracting structure
 
--   [ ] Correct legal entity for Customer and Provider verified.
--   [ ] Any Wheels affiliate, lessor, finance provider or servicing
-    entity identified correctly.
--   [ ] Contract signatories have authority.
--   [ ] Customer affiliates and participating entities are covered
-    appropriately.
--   [ ] MSA, SOW, vehicle lease and supplier documents have a clear
-    hierarchy.
+- [ ] Correct legal entity for Customer and Provider verified.
+- [ ] Any Wheels affiliate, lessor, finance provider or servicing
+      entity identified correctly.
+- [ ] Contract signatories have authority.
+- [ ] Customer affiliates and participating entities are covered
+      appropriately.
+- [ ] MSA, SOW, vehicle lease and supplier documents have a clear
+      hierarchy.
 
 ## B. Scope and operations
 
--   [ ] Services, vehicles, Drivers, territories and business units are
-    precisely defined.
--   [ ] Exclusions are explicit.
--   [ ] Vehicle ordering and approval authority is documented.
--   [ ] Maintenance, fuel, charging, claims and roadside roles are
-    allocated.
--   [ ] Supplier responsibilities and subcontracting are addressed.
--   [ ] Customer dependencies and Provider dependencies are documented.
--   [ ] Service levels are measurable and supported by available data.
+- [ ] Services, vehicles, Drivers, territories and business units are
+      precisely defined.
+- [ ] Exclusions are explicit.
+- [ ] Vehicle ordering and approval authority is documented.
+- [ ] Maintenance, fuel, charging, claims and roadside roles are
+      allocated.
+- [ ] Supplier responsibilities and subcontracting are addressed.
+- [ ] Customer dependencies and Provider dependencies are documented.
+- [ ] Service levels are measurable and supported by available data.
 
 ## C. Economics
 
--   [ ] Total cost of ownership has been reviewed, not just the
-    management fee.
--   [ ] Lease rentals, funding costs and residual-value exposure are
-    clear.
--   [ ] Pass-through charges and mark-ups are transparent.
--   [ ] Taxes, currency, invoice frequency and payment terms are clear.
--   [ ] Invoice evidence and dispute deadlines are workable.
--   [ ] Early termination and end-of-lease charges have been modelled.
--   [ ] Remarketing proceeds, shortfalls and surpluses are allocated.
+- [ ] Total cost of ownership has been reviewed, not just the
+      management fee.
+- [ ] Lease rentals, funding costs and residual-value exposure are
+      clear.
+- [ ] Pass-through charges and mark-ups are transparent.
+- [ ] Taxes, currency, invoice frequency and payment terms are clear.
+- [ ] Invoice evidence and dispute deadlines are workable.
+- [ ] Early termination and end-of-lease charges have been modelled.
+- [ ] Remarketing proceeds, shortfalls and surpluses are allocated.
 
 ## D. Asset, insurance and liability
 
--   [ ] Vehicle title, registration, lessee and risk of loss are clear.
--   [ ] Insurance responsibility and policy limits align with the
-    contract.
--   [ ] Deductibles and uninsured losses are allocated.
--   [ ] Liability caps have been assessed against plausible exposure.
--   [ ] Indemnities identify covered claims and defence procedures.
--   [ ] Vehicle damage, Driver conduct, repair defects and third-party
-    claims are addressed.
+- [ ] Vehicle title, registration, lessee and risk of loss are clear.
+- [ ] Insurance responsibility and policy limits align with the
+      contract.
+- [ ] Deductibles and uninsured losses are allocated.
+- [ ] Liability caps have been assessed against plausible exposure.
+- [ ] Indemnities identify covered claims and defence procedures.
+- [ ] Vehicle damage, Driver conduct, repair defects and third-party
+      claims are addressed.
 
 ## E. Data, compliance and resilience
 
--   [ ] Fleet, Driver and telematics data are identified and classified.
--   [ ] Data use, access, retention and deletion are defined.
--   [ ] Cybersecurity and incident notification obligations are agreed.
--   [ ] Applicable vehicle, road safety, tax, privacy and other laws are
-    identified.
--   [ ] Business continuity and recovery commitments are realistic.
--   [ ] Audit and regulatory access rights are sufficient.
+- [ ] Fleet, Driver and telematics data are identified and classified.
+- [ ] Data use, access, retention and deletion are defined.
+- [ ] Cybersecurity and incident notification obligations are agreed.
+- [ ] Applicable vehicle, road safety, tax, privacy and other laws are
+      identified.
+- [ ] Business continuity and recovery commitments are realistic.
+- [ ] Audit and regulatory access rights are sufficient.
 
 ## F. Termination and exit
 
--   [ ] MSA termination and individual vehicle lease termination are
-    distinguished.
--   [ ] Early termination costs are understood.
--   [ ] Open orders, repairs, claims and invoices have an exit process.
--   [ ] Vehicle return and title transfer are covered.
--   [ ] Data migration and transition assistance are defined.
--   [ ] Critical services can continue during transition.
+- [ ] MSA termination and individual vehicle lease termination are
+      distinguished.
+- [ ] Early termination costs are understood.
+- [ ] Open orders, repairs, claims and invoices have an exit process.
+- [ ] Vehicle return and title transfer are covered.
+- [ ] Data migration and transition assistance are defined.
+- [ ] Critical services can continue during transition.
 
-------------------------------------------------------------------------
+---
 
 # 7. How to analyse an actual Wheels-related agreement
 
@@ -1648,109 +1670,117 @@ When reviewing a real agreement, prepare the analysis in this order:
 
 ## 7.1 Recommended output for each contract review
 
-  -----------------------------------------------------------------------
-  Review item                         What the reviewer should record
-  ----------------------------------- -----------------------------------
-  Clause / page                       Exact location in the agreement
+---
 
-  Contract wording                    Relevant text or concise quotation
+Review item What the reviewer should record
 
-  Plain-English meaning               What it requires or permits
+---
 
-  Business impact                     Effect on fleet operations,
-                                      customer or provider
+Clause / page Exact location in the agreement
 
-  Financial impact                    Revenue, cost, cash flow or
-                                      exposure
+Contract wording Relevant text or concise quotation
 
-  Risk owner                          Customer, Provider, lessor,
-                                      supplier, Driver or shared
+Plain-English meaning What it requires or permits
 
-  Risk level                          Critical / High / Medium / Low,
-                                      with rationale
+Business impact Effect on fleet operations,
+customer or provider
 
-  Ambiguity / gap                     What is missing or unclear
+Financial impact Revenue, cost, cash flow or
+exposure
 
-  Recommended action                  Accept, clarify, amend, escalate or
-                                      obtain evidence
+Risk owner Customer, Provider, lessor,
+supplier, Driver or shared
 
-  Owner                               Legal, commercial, finance,
-                                      operations, risk, IT/security
-  -----------------------------------------------------------------------
+Risk level Critical / High / Medium / Low,
+with rationale
 
-------------------------------------------------------------------------
+Ambiguity / gap What is missing or unclear
+
+Recommended action Accept, clarify, amend, escalate or
+obtain evidence
+
+Owner Legal, commercial, finance,
+operations, risk, IT/security
+
+---
+
+---
 
 # 8. Drafting discipline and important cautions
 
--   Never assume that a public description of a company's business
-    proves that a particular service, product, entity or contractual
-    practice applies to the transaction being reviewed.
--   Never infer that a parent company guarantees an affiliate's
-    obligations unless an express guarantee or other enforceable
-    commitment exists.
--   Never infer that a fleet manager owns or leases vehicles. Verify
-    title, lease and funding documents.
--   Never assume a service provider is the insurer or bears every risk
-    associated with a vehicle.
--   Never assume that a supplier's failure is automatically excused;
-    examine the Provider's obligations to select, oversee and manage
-    suppliers.
--   Never accept a service credit as the sole remedy without
-    understanding its cap and interaction with other remedies.
--   Never accept a liability cap without comparing it with vehicle
-    value, third-party claims, personal injury, data exposure and
-    realistic loss scenarios.
--   Never treat an operational policy or portal term as contractually
-    binding unless properly incorporated.
--   Keep the source agreement's actual wording and commercial intent
-    distinct from proposed improvements.
--   Where the source document is silent, record **"not addressed in the
-    document"** rather than filling the gap with an assumption.
+- Never assume that a public description of a company's business
+  proves that a particular service, product, entity or contractual
+  practice applies to the transaction being reviewed.
+- Never infer that a parent company guarantees an affiliate's
+  obligations unless an express guarantee or other enforceable
+  commitment exists.
+- Never infer that a fleet manager owns or leases vehicles. Verify
+  title, lease and funding documents.
+- Never assume a service provider is the insurer or bears every risk
+  associated with a vehicle.
+- Never assume that a supplier's failure is automatically excused;
+  examine the Provider's obligations to select, oversee and manage
+  suppliers.
+- Never accept a service credit as the sole remedy without
+  understanding its cap and interaction with other remedies.
+- Never accept a liability cap without comparing it with vehicle
+  value, third-party claims, personal injury, data exposure and
+  realistic loss scenarios.
+- Never treat an operational policy or portal term as contractually
+  binding unless properly incorporated.
+- Keep the source agreement's actual wording and commercial intent
+  distinct from proposed improvements.
+- Where the source document is silent, record **"not addressed in the
+  document"** rather than filling the gap with an assumption.
 
-------------------------------------------------------------------------
+---
 
 # 9. Source-document map
 
-The uploaded 14-page *Logistics Services Agreement* provides the
+The uploaded 14-page _Logistics Services Agreement_ provides the
 following reference structure:
 
-  -----------------------------------------------------------------------
-  Source pages            Main subject            How this template uses
-                                                  it
-  ----------------------- ----------------------- -----------------------
-  1--2                    Parties, recitals,      Parties, recitals,
-                          services, products,     scope, fleet
-                          distribution centre,    population, locations
-                          rates and payment       and pricing
+---
 
-  3                       Invoice disputes and    Invoice dispute
-                          service standards       mechanics and service
-                                                  quality
+Source pages Main subject How this template uses
+it
 
-  4--6                    Ownership, reporting,   Vehicle/data ownership
-                          review meetings,        prompts, governance,
-                          operational policies,   incident and operating
-                          special materials and   schedules, compliance
-                          legal compliance        
+---
 
-  7--8                    Insurance, liability    Insurance, liability,
-                          limitations,            indemnities,
-                          indemnification,        confidentiality and
-                          subrogation and         risk allocation
-                          confidentiality         
+1--2 Parties, recitals, Parties, recitals,
+services, products, scope, fleet
+distribution centre, population, locations
+rates and payment and pricing
 
-  9--11                   Term, termination,      Termination,
-                          existing services,      transition, notices and
-                          miscellaneous           general provisions
-                          provisions and notices  
+3 Invoice disputes and Invoice dispute
+service standards mechanics and service
+quality
 
-  12--14                  Governing law,          Governing law,
-                          amendment,              boilerplate, order of
-                          counterparts,           precedence and
-                          assignment,             signature blocks
-                          interpretation and      
-                          signatures              
-  -----------------------------------------------------------------------
+4--6 Ownership, reporting, Vehicle/data ownership
+review meetings, prompts, governance,
+operational policies, incident and operating
+special materials and schedules, compliance
+legal compliance
+
+7--8 Insurance, liability Insurance, liability,
+limitations, indemnities,
+indemnification, confidentiality and
+subrogation and risk allocation
+confidentiality
+
+9--11 Term, termination, Termination,
+existing services, transition, notices and
+miscellaneous general provisions
+provisions and notices
+
+12--14 Governing law, Governing law,
+amendment, boilerplate, order of
+counterparts, precedence and
+assignment, signature blocks
+interpretation and  
+ signatures
+
+---
 
 **Source limitation:** The source is a logistics services agreement, not
 a fleet-management MSA. It does not establish Wheels-specific positions

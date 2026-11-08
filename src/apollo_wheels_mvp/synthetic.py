@@ -169,7 +169,12 @@ def _pdf_safe(value: object) -> str:
     return escape(text.encode("ascii", "replace").decode("ascii"))
 
 
-def _template_agreement_lines(kind: str, client_name: str, prefix: str) -> list[str]:
+def _template_agreement_lines(
+    kind: str,
+    client_name: str,
+    prefix: str,
+    parties: dict[str, object] | None = None,
+) -> list[str]:
     """Read contract clauses from the supplied drafting templates for demo PDFs."""
     root = Path(__file__).resolve().parents[2]
     if kind == "MSA":
@@ -204,6 +209,31 @@ def _template_agreement_lines(kind: str, client_name: str, prefix: str) -> list[
         "GOVERNING_LAW": "the laws of Delaware", "NOTICE_EMAIL": "contracts@example.com",
         "NOTICE_ADDRESS": "the registered office stated above", "SIGNATORY_TITLE": "Authorised Representative",
     }
+    parties = parties or {}
+    client_party = parties.get("client", {}) if isinstance(parties, dict) else {}
+    provider_party = parties.get("provider", {}) if isinstance(parties, dict) else {}
+    if not isinstance(client_party, dict):
+        client_party = {}
+    if not isinstance(provider_party, dict):
+        provider_party = {}
+    field_values.update({
+        "CUSTOMER_LEGAL_NAME": client_party.get("legal_name") or field_values["CUSTOMER_LEGAL_NAME"],
+        "CUSTOMER_ENTITY_TYPE": client_party.get("entity_type") or field_values["ENTITY_TYPE"],
+        "CUSTOMER_PLACE_OF_FORMATION": client_party.get("formation_jurisdiction") or field_values["PLACE_OF_FORMATION"],
+        "CUSTOMER_REGISTERED_ADDRESS": client_party.get("registered_address") or field_values["CUSTOMER_REGISTERED_ADDRESS"],
+        "LESSEE FULL LEGAL NAME": client_party.get("legal_name") or field_values["LESSEE FULL LEGAL NAME"],
+        "LESSEE ENTITY TYPE": client_party.get("entity_type") or field_values["ENTITY_TYPE"],
+        "LESSEE JURISDICTION": client_party.get("formation_jurisdiction") or field_values["JURISDICTION"],
+        "LESSEE ADDRESS": client_party.get("registered_address") or field_values["ADDRESS"],
+        "PROVIDER_LEGAL_NAME": provider_party.get("legal_name") or field_values["PROVIDER_LEGAL_NAME"],
+        "PROVIDER_ENTITY_TYPE": provider_party.get("entity_type") or field_values["ENTITY_TYPE"],
+        "PROVIDER_PLACE_OF_FORMATION": provider_party.get("formation_jurisdiction") or field_values["PLACE_OF_FORMATION"],
+        "PROVIDER_REGISTERED_ADDRESS": provider_party.get("registered_address") or field_values["PROVIDER_REGISTERED_ADDRESS"],
+        "LESSOR FULL LEGAL NAME": provider_party.get("legal_name") or field_values["LESSOR FULL LEGAL NAME"],
+        "LESSOR ENTITY TYPE": provider_party.get("entity_type") or field_values["ENTITY_TYPE"],
+        "LESSOR JURISDICTION": provider_party.get("formation_jurisdiction") or field_values["JURISDICTION"],
+        "LESSOR ADDRESS": provider_party.get("registered_address") or field_values["ADDRESS"],
+    })
 
     def fill_field(match: re.Match) -> str:
         key = (match.group(1) or match.group(2)).strip().upper()
@@ -464,14 +494,12 @@ def write_demo_invoice(
 
 def write_mla_from_extracted(path: Path, client_id: str, client_name: str, extracted: dict[str, object], version: str) -> Path:
     """Generate an MLA PDF from extracted terms (used for regeneration after save)."""
-    from .extraction import extract_agreement_terms
-
     lease = extracted.get("lease", {}) or {}
     if not lease:
         raise ValueError("No lease data in extracted terms")
-
-    lease_quantity = lease.get("quantity", 300)
-    lease_rate = lease.get("contract_amount", 1050.00)
+    vehicles = lease.get("vehicles") or [lease]
+    if not vehicles:
+        raise ValueError("No vehicle rows in extracted lease terms")
     lines = [
         "MASTER LEASE AGREEMENT",
         f"CLIENT_ID: {client_id}",
@@ -481,11 +509,25 @@ def write_mla_from_extracted(path: Path, client_id: str, client_name: str, extra
         f"VERSION: {version}",
         f"EFFECTIVE_DATE: {lease.get('effective_from', '2026-01-01')}",
         f"This sample agreement records the vehicle lease terms between Apollo Wheels LLC and {client_name}, LLC.",
-        *_template_agreement_lines("MLA", client_name, "MLA"),
+        *_template_agreement_lines("MLA", client_name, "MLA", extracted.get("parties")),
         "The vehicle and lease schedule below forms part of this Agreement and states the assets, rental, term and billing arrangement.",
-        f"LEASE|LEASE-01|Fleet vehicle lease|{lease_quantity}|vehicle_month|{lease_rate:.2f}|48|{lease.get('effective_from', '2026-01-01')}|{lease.get('billing_frequency', 'monthly')}|1|{lease.get('vehicle_make', 'Ford')}|{lease.get('vehicle_model', 'Transit')}|{lease.get('engine_type', 'Hybrid')}|USD",
-        "END_OF_AGREEMENT",
     ]
+    for index, vehicle in enumerate(vehicles, start=1):
+        rate = vehicle.get("contract_amount")
+        quantity = vehicle.get("quantity")
+        if rate is None or quantity is None:
+            raise ValueError("Each MLA vehicle row needs a quantity and monthly rate before saving.")
+        lines.append(
+            f"LEASE|{vehicle.get('service_code', f'LEASE-{index:02d}')}|{vehicle.get('service_name', 'Fleet vehicle lease')}|"
+            f"{quantity}|{vehicle.get('rate_unit', 'vehicle_month')}|{float(rate):.2f}|"
+            f"{vehicle.get('term_months', lease.get('term_months', 48))}|"
+            f"{vehicle.get('effective_from', lease.get('effective_from', '2026-01-01'))}|"
+            f"{vehicle.get('billing_frequency', lease.get('billing_frequency', 'monthly'))}|"
+            f"{vehicle.get('billing_day', lease.get('billing_day', '1'))}|"
+            f"{vehicle.get('vehicle_make', '')}|{vehicle.get('vehicle_model', '')}|"
+            f"{vehicle.get('engine_type', '')}|{vehicle.get('pricing_basis', lease.get('pricing_basis', 'USD'))}"
+        )
+    lines.append("END_OF_AGREEMENT")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(make_text_pdf(lines))
     return path
@@ -553,7 +595,7 @@ def write_msa_from_extracted(path: Path, client_id: str, client_name: str, extra
         f"VERSION: {version}",
         "EFFECTIVE_DATE: 2026-01-01",
         f"This sample agreement records the terms on which Apollo Wheels LLC provides fleet management services to {client_name}, LLC.",
-        *_template_agreement_lines("MSA", client_name, prefix),
+        *_template_agreement_lines("MSA", client_name, prefix, extracted.get("parties")),
         "Schedule 1 forms part of this Agreement. Each service section below states the service scope, selection status, billing basis, recurring charge and initial quantity basis.",
         "SECTION: Schedule 1 - Services and recurring charges",
         *service_lines,

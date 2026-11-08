@@ -1,4 +1,5 @@
 # Master Lease Agreement (MLA)
+
 ## Compact reusable template and field guide — Fleet / Equipment Leasing
 
 **Purpose.** A reusable drafting and analysis reference based on the supplied 31-page Caterpillar Financial Services Corporation / CDM Resource Management, LLC Master Lease Agreement dated February 26, 2009, including its Schedule-based structure and Appendix A definitions.
@@ -15,13 +16,13 @@ The **Master Lease Agreement (MLA)** contains the standing legal framework. Each
 
 Replace every `[BRACKETED FIELD]`. Delete unused alternatives and drafting notes before signature.
 
-| Marker | Meaning |
-|---|---|
-| `[FIELD]` | Complete with transaction-specific information |
-| `[SELECT ONE]` | Select the approved alternative |
-| `[IF APPLICABLE]` | Include only where relevant |
-| `[LEGAL REVIEW]` | Counsel approval required |
-| `[BUSINESS APPROVAL]` | Commercial / operational approval required |
+| Marker                | Meaning                                        |
+| --------------------- | ---------------------------------------------- |
+| `[FIELD]`             | Complete with transaction-specific information |
+| `[SELECT ONE]`        | Select the approved alternative                |
+| `[IF APPLICABLE]`     | Include only where relevant                    |
+| `[LEGAL REVIEW]`      | Counsel approval required                      |
+| `[BUSINESS APPROVAL]` | Commercial / operational approval required     |
 
 **Recommended workflow:** identify parties and lease model → collect approved commercial and asset data → complete MLA and Schedules → attach supporting documents → reconcile cross-references and calculations → resolve legal / tax / credit / operational approvals → execute and retain the complete document set.
 
@@ -37,8 +38,8 @@ Replace every `[BRACKETED FIELD]`. Delete unused alternatives and drafting notes
 
 This Master Lease Agreement (the **“Agreement”**) is dated **[AGREEMENT DATE]** and entered into by:
 
-1. **[LESSOR FULL LEGAL NAME]**, a **[ENTITY TYPE]** organized under the laws of **[JURISDICTION]**, with its principal / notice address at **[ADDRESS]** (**“Lessor”**); and
-2. **[LESSEE FULL LEGAL NAME]**, a **[ENTITY TYPE]** organized under the laws of **[JURISDICTION]**, with its principal / notice address at **[ADDRESS]** (**“Lessee”**).
+1. **[LESSOR FULL LEGAL NAME]**, a **[LESSOR ENTITY TYPE]** organized under the laws of **[LESSOR JURISDICTION]**, with its principal / notice address at **[LESSOR ADDRESS]** (**"Lessor"**); and
+2. **[LESSEE FULL LEGAL NAME]**, a **[LESSEE ENTITY TYPE]** organized under the laws of **[LESSEE JURISDICTION]**, with its principal / notice address at **[LESSEE ADDRESS]** (**"Lessee"**).
 
 Each is a **“Party”**, together the **“Parties.”**
 
@@ -338,12 +339,12 @@ Include counsel-approved provisions for:
 ## 20. Signature blocks
 
 **[LESSOR FULL LEGAL NAME]**  
-By: ____________________  Name: **[NAME]**  
-Title: **[TITLE]**  Date: **[DATE]**
+By: ********\_\_\_\_******** Name: **[NAME]**  
+Title: **[TITLE]** Date: **[DATE]**
 
 **[LESSEE FULL LEGAL NAME]**  
-By: ____________________  Name: **[NAME]**  
-Title: **[TITLE]**  Date: **[DATE]**
+By: ********\_\_\_\_******** Name: **[NAME]**  
+Title: **[TITLE]** Date: **[DATE]**
 
 Confirm authority, required signatories, execution method, and whether signature date differs from effective date. Retain the final signed version and supporting documents.
 
@@ -359,58 +360,58 @@ This Schedule is entered into under the MLA dated **[DATE]** between **[LESSOR]*
 
 ### A. Schedule control
 
-| Field | Value |
-|---|---|
-| Schedule number / date | `[ID] / [DATE]` |
-| MLA reference / version | `[ID / VERSION]` |
-| Customer / program ID | `[ID]` |
-| Prepared / approved by | `[NAMES / ROLES]` |
+| Field                   | Value             |
+| ----------------------- | ----------------- |
+| Schedule number / date  | `[ID] / [DATE]`   |
+| MLA reference / version | `[ID / VERSION]`  |
+| Customer / program ID   | `[ID]`            |
+| Prepared / approved by  | `[NAMES / ROLES]` |
 
 ### B. Asset identification
 
-| Field | Value |
-|---|---|
-| Asset type / quantity | `[TYPE / NUMBER]` |
-| Manufacturer / model / year | `[DETAILS]` |
-| VIN / serial number | `[UNIQUE ID]` |
-| Registration number | `[IF AVAILABLE]` |
-| Supplier / dealer | `[LEGAL NAME]` |
-| Delivery / in-service location | `[LOCATION]` |
-| Accessories / upfit | `[DETAILS]` |
-| Delivery / acceptance date | `[DATES]` |
-| Odometer / hours / condition | `[READING / REPORT REF]` |
+| Field                          | Value                    |
+| ------------------------------ | ------------------------ |
+| Asset type / quantity          | `[TYPE / NUMBER]`        |
+| Manufacturer / model / year    | `[DETAILS]`              |
+| VIN / serial number            | `[UNIQUE ID]`            |
+| Registration number            | `[IF AVAILABLE]`         |
+| Supplier / dealer              | `[LEGAL NAME]`           |
+| Delivery / in-service location | `[LOCATION]`             |
+| Accessories / upfit            | `[DETAILS]`              |
+| Delivery / acceptance date     | `[DATES]`                |
+| Odometer / hours / condition   | `[READING / REPORT REF]` |
 
 ### C. Economics and term
 
-| Field | Value |
-|---|---|
-| Commencement trigger / date | `[DETAILS]` |
-| Term / expiry date | `[DETAILS]` |
-| Rent / currency / frequency | `[DETAILS]` |
-| First payment / due date | `[DATES]` |
+| Field                        | Value                             |
+| ---------------------------- | --------------------------------- |
+| Commencement trigger / date  | `[DETAILS]`                       |
+| Term / expiry date           | `[DETAILS]`                       |
+| Rent / currency / frequency  | `[DETAILS]`                       |
+| First payment / due date     | `[DATES]`                         |
 | Taxes / fees / other charges | `[INCLUDED / EXCLUDED / DETAILS]` |
-| Deposit / advance | `[AMOUNT / N/A]` |
+| Deposit / advance            | `[AMOUNT / N/A]`                  |
 
 ### D. End-of-term and services
 
-| Field | Value |
-|---|---|
-| Purchase / renewal option | `[TERMS / NONE]` |
-| Return location / deadline | `[DETAILS]` |
-| Mileage / usage allowance | `[ALLOWANCE]` |
-| Excess usage / damage charges | `[FORMULA / RATE CARD]` |
-| Maintenance responsibility | `[PARTY / PROGRAM]` |
-| Insurance responsibility / limits | `[PARTY / DETAILS]` |
-| Permitted use / users / territory | `[DETAILS]` |
-| Special conditions | `[DETAILS]` |
-| Conditions precedent / waivers | `[STATUS / AUTHORITY]` |
-| Supporting documents | `[LIST / REPOSITORY REFERENCES]` |
+| Field                             | Value                            |
+| --------------------------------- | -------------------------------- |
+| Purchase / renewal option         | `[TERMS / NONE]`                 |
+| Return location / deadline        | `[DETAILS]`                      |
+| Mileage / usage allowance         | `[ALLOWANCE]`                    |
+| Excess usage / damage charges     | `[FORMULA / RATE CARD]`          |
+| Maintenance responsibility        | `[PARTY / PROGRAM]`              |
+| Insurance responsibility / limits | `[PARTY / DETAILS]`              |
+| Permitted use / users / territory | `[DETAILS]`                      |
+| Special conditions                | `[DETAILS]`                      |
+| Conditions precedent / waivers    | `[STATUS / AUTHORITY]`           |
+| Supporting documents              | `[LIST / REPOSITORY REFERENCES]` |
 
 The assets identified in this Schedule are subject to the MLA, as supplemented by the terms expressly stated here.
 
-**[LESSOR LEGAL NAME]** — By: __________ Name / Title: **[DETAILS]** Date: **[DATE]**
+**[LESSOR LEGAL NAME]** — By: ****\_\_**** Name / Title: **[DETAILS]** Date: **[DATE]**
 
-**[LESSEE LEGAL NAME]** — By: __________ Name / Title: **[DETAILS]** Date: **[DATE]**
+**[LESSEE LEGAL NAME]** — By: ****\_\_**** Name / Title: **[DETAILS]** Date: **[DATE]**
 
 ### Schedule field guide
 
@@ -425,7 +426,7 @@ VIN / serial number uniquely identifies the asset; registration may change. Deli
 Lessee confirms that the asset(s) **[VIN / SERIAL / DESCRIPTION]** were delivered to **[LOCATION]** on **[DATE]** and are **[ACCEPTED / ACCEPTED SUBJECT TO ATTACHED EXCEPTIONS]** following **[INSPECTION STANDARD]**. Odometer / hours: **[READING]**. Keys, accessories, manuals, and documents: **[COMPLETE / EXCEPTIONS]**. Condition report: **[REFERENCE]**.
 
 Lessee authorized representative: **[NAME / TITLE]**  
-Signature: ____________________ Date: **[DATE]**
+Signature: ********\_\_\_\_******** Date: **[DATE]**
 
 **Why needed:** Evidence of delivery and acceptance. The MLA and Schedule must state whether acceptance triggers rent, funding, risk transfer, or another legal consequence. Do not assume it has the same effect in every deal.
 
@@ -453,32 +454,32 @@ Permitted User acknowledges **[NO OWNERSHIP / OTHER APPROVED ACKNOWLEDGMENT]**.
 
 Maintain one approved definition per term and use it consistently across the MLA, Schedules, and exhibits.
 
-| Term | Required definition / reason |
-|---|---|
-| Acceptance Certificate | Form, signer, and legal effect of acceptance |
-| Applicable Law / Business Day | Legal scope and deadline calculation |
-| Casualty Occurrence / Casualty Value | Trigger and financial settlement after loss |
-| Commencement Date / Term / Base Term | Start and duration of lease |
-| Default / Event of Default | Trigger for remedies |
-| Equipment / Vehicle | Assets and included accessories |
-| Fair Market Value / Appraisal Process | Valuation standard and dispute process |
-| Lease Documents / Schedule | Complete contractual document set |
-| Lessor / Lessee / Permitted User | Parties and authorized users |
-| Lien | Security interest or encumbrance |
-| Purchase / Early Buyout / Renewal Option | Exercise rights, dates, and price |
-| Rent / Currency | Payment obligation and units |
-| Supplier / Vendor | Seller, manufacturer, or provider |
-| UCC / local equivalent | Relevant secured-transactions framework, if applicable |
+| Term                                     | Required definition / reason                           |
+| ---------------------------------------- | ------------------------------------------------------ |
+| Acceptance Certificate                   | Form, signer, and legal effect of acceptance           |
+| Applicable Law / Business Day            | Legal scope and deadline calculation                   |
+| Casualty Occurrence / Casualty Value     | Trigger and financial settlement after loss            |
+| Commencement Date / Term / Base Term     | Start and duration of lease                            |
+| Default / Event of Default               | Trigger for remedies                                   |
+| Equipment / Vehicle                      | Assets and included accessories                        |
+| Fair Market Value / Appraisal Process    | Valuation standard and dispute process                 |
+| Lease Documents / Schedule               | Complete contractual document set                      |
+| Lessor / Lessee / Permitted User         | Parties and authorized users                           |
+| Lien                                     | Security interest or encumbrance                       |
+| Purchase / Early Buyout / Renewal Option | Exercise rights, dates, and price                      |
+| Rent / Currency                          | Payment obligation and units                           |
+| Supplier / Vendor                        | Seller, manufacturer, or provider                      |
+| UCC / local equivalent                   | Relevant secured-transactions framework, if applicable |
 
 ## 26. Exhibits register
 
 The source agreement refers to Exhibits A–F. Verify the actual exhibit titles and contents in the complete executed document set before reusing labels.
 
-| Exhibit | Intended content to verify |
-|---|---|
-| A–D | `[CHECK SOURCE TITLES, FORMS AND CLAUSE REFERENCES]` |
-| E | Source refers to a Permitted Use Agreement form; verify exact contents |
-| F | `[CHECK SOURCE TITLE, FORM AND CLAUSE REFERENCES]` |
+| Exhibit | Intended content to verify                                             |
+| ------- | ---------------------------------------------------------------------- |
+| A–D     | `[CHECK SOURCE TITLES, FORMS AND CLAUSE REFERENCES]`                   |
+| E       | Source refers to a Permitted Use Agreement form; verify exact contents |
+| F       | `[CHECK SOURCE TITLE, FORM AND CLAUSE REFERENCES]`                     |
 
 Do not invent exhibit titles or attach a form merely because a clause refers to an exhibit. Every reference must point to an actual, approved attachment.
 
@@ -490,31 +491,31 @@ Do not invent exhibit titles or attach a form merely because a clause refers to 
 
 For each transaction, identify who performs each role. Do not assume one entity performs all roles.
 
-| Role | Confirm |
-|---|---|
-| Legal owner / title holder | Which entity owns the vehicle / equipment? |
-| Funding entity | Who funds or holds the financing? |
-| Contractual Lessor / Lessee | Which legal entities sign and owe rent? |
+| Role                          | Confirm                                                |
+| ----------------------------- | ------------------------------------------------------ |
+| Legal owner / title holder    | Which entity owns the vehicle / equipment?             |
+| Funding entity                | Who funds or holds the financing?                      |
+| Contractual Lessor / Lessee   | Which legal entities sign and owe rent?                |
 | Fleet manager / administrator | Who orders, registers, maintains, bills, or remarkets? |
-| Supplier / dealer | Who sells and delivers the asset? |
-| Insurer / broker | Who arranges coverage and handles claims? |
-| Permitted user / driver | Who actually operates the asset? |
-| Remarketing party | Who disposes of the asset and receives proceeds? |
+| Supplier / dealer             | Who sells and delivers the asset?                      |
+| Insurer / broker              | Who arranges coverage and handles claims?              |
+| Permitted user / driver       | Who actually operates the asset?                       |
+| Remarketing party             | Who disposes of the asset and receives proceeds?       |
 
 ## 28. Lifecycle and clause map
 
-| Lifecycle stage | Review | Key question |
-|---|---|---|
-| Onboarding | Parties, representations, conditions | Is the correct entity approved and authorized? |
-| Ordering / acquisition | Schedule, purchase documents, title | Who orders, pays, and takes title? |
-| Delivery / acceptance | Acceptance Certificate | What event starts rent and risk? |
-| Operation | Use, driver, insurance | Who may use the asset and where? |
-| Maintenance | Maintenance clause / service terms | Who authorizes, performs, and pays? |
-| Accident / theft | Casualty, insurance, indemnity | Who reports, repairs, claims, and settles? |
-| Mid-term change | Assignment, substitution, amendment | Can assets be swapped or transferred? |
-| End of term | Return, renewal, purchase | What choices and deadlines apply? |
-| Remarketing | FMV, condition, title | Who bears residual-value risk? |
-| Default / recovery | Default and remedies | Who authorizes lawful recovery? |
+| Lifecycle stage        | Review                               | Key question                                   |
+| ---------------------- | ------------------------------------ | ---------------------------------------------- |
+| Onboarding             | Parties, representations, conditions | Is the correct entity approved and authorized? |
+| Ordering / acquisition | Schedule, purchase documents, title  | Who orders, pays, and takes title?             |
+| Delivery / acceptance  | Acceptance Certificate               | What event starts rent and risk?               |
+| Operation              | Use, driver, insurance               | Who may use the asset and where?               |
+| Maintenance            | Maintenance clause / service terms   | Who authorizes, performs, and pays?            |
+| Accident / theft       | Casualty, insurance, indemnity       | Who reports, repairs, claims, and settles?     |
+| Mid-term change        | Assignment, substitution, amendment  | Can assets be swapped or transferred?          |
+| End of term            | Return, renewal, purchase            | What choices and deadlines apply?              |
+| Remarketing            | FMV, condition, title                | Who bears residual-value risk?                 |
+| Default / recovery     | Default and remedies                 | Who authorizes lawful recovery?                |
 
 ## 29. Economics and risk checklist
 
@@ -531,18 +532,18 @@ For each Schedule, extract and reconcile:
 - casualty value, insurance proceeds, deductible, and salvage;
 - return-condition and damage charges.
 
-| Risk | Clause | Review question |
-|---|---|---|
-| Title / liens | Title, purchase documents | Is ownership clear and correctly held? |
-| Delivery / acceptance | Schedule, certificate | Who bears risk before / after acceptance? |
-| Residual value | Term, options, return | Who bears market-value risk? |
-| Maintenance | Maintenance / use | Who authorizes and pays? |
-| Casualty | Loss, insurance, indemnity | Does settlement reconcile with insurance? |
-| Liability | Insurance / indemnity | Who covers third-party claims? |
-| Tax | Tax clause | Who files, pays, and bears cost? |
-| Credit | Covenants / default | What monitoring and remedies exist? |
-| Data / telematics | Specific data terms | What data is collected and who may use it? |
-| Return | Return standard | Are inspection and charges measurable? |
+| Risk                  | Clause                     | Review question                            |
+| --------------------- | -------------------------- | ------------------------------------------ |
+| Title / liens         | Title, purchase documents  | Is ownership clear and correctly held?     |
+| Delivery / acceptance | Schedule, certificate      | Who bears risk before / after acceptance?  |
+| Residual value        | Term, options, return      | Who bears market-value risk?               |
+| Maintenance           | Maintenance / use          | Who authorizes and pays?                   |
+| Casualty              | Loss, insurance, indemnity | Does settlement reconcile with insurance?  |
+| Liability             | Insurance / indemnity      | Who covers third-party claims?             |
+| Tax                   | Tax clause                 | Who files, pays, and bears cost?           |
+| Credit                | Covenants / default        | What monitoring and remedies exist?        |
+| Data / telematics     | Specific data terms        | What data is collected and who may use it? |
+| Return                | Return standard            | Are inspection and charges measurable?     |
 
 **Analyst test for every clause:** Who is responsible? Which asset / Schedule? What triggers the duty? What is the deadline? What evidence proves compliance? Who pays? What happens on breach? Is it lawful? Can the operating model and systems actually perform it?
 
@@ -573,9 +574,9 @@ For each Schedule, extract and reconcile:
 
 ## 31. Deviation and approval register
 
-| Clause | Requested change / reason | Financial, legal and operational impact | Approver / date |
-|---|---|---|---|
-| `[CLAUSE]` | `[CHANGE / RATIONALE]` | `[IMPACT]` | `[APPROVER / DATE]` |
+| Clause     | Requested change / reason | Financial, legal and operational impact | Approver / date     |
+| ---------- | ------------------------- | --------------------------------------- | ------------------- |
+| `[CLAUSE]` | `[CHANGE / RATIONALE]`    | `[IMPACT]`                              | `[APPROVER / DATE]` |
 
 Record all deviations from the approved standard form. Do not treat unresolved issues as accepted because a document has reached signature preparation.
 
@@ -635,12 +636,12 @@ Validate required fields, dates, currency, numeric amounts, unique IDs, and cond
 
 ### Review sign-off
 
-| Area | Reviewer | Decision / date |
-|---|---|---|
+| Area                  | Reviewer | Decision / date                |
+| --------------------- | -------- | ------------------------------ |
 | Commercial / business | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Fleet operations | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Credit / finance | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Tax / accounting | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Insurance / risk | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Legal | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
-| Document control | `[NAME]` | `[FINAL VERSION / DATE]` |
+| Fleet operations      | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
+| Credit / finance      | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
+| Tax / accounting      | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
+| Insurance / risk      | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
+| Legal                 | `[NAME]` | `[APPROVED / COMMENTS / DATE]` |
+| Document control      | `[NAME]` | `[FINAL VERSION / DATE]`       |

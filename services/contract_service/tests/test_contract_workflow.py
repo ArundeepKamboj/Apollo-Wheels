@@ -9,6 +9,8 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from services.auth import Identity
+from apollo_wheels_mvp.documents import extract_pdf_pages, extract_pdf_text
+from apollo_wheels_mvp.storage import connect
 from apollo_wheels_mvp.synthetic import make_text_pdf
 from apollo_wheels_mvp.extraction import detect_agreement_type
 from services.contract_service import api, domain
@@ -18,7 +20,7 @@ from services.test_support import MemoryUpload, PROJECT_ROOT, run_upload, setup_
 
 class ContractWorkflowTests(unittest.TestCase):
     def setUp(self):
-        self.root = setup_demo(self)
+        self.root = setup_demo(self, include_workflow_history=False)
 
     def upload(self, filename="agreement.pdf", data=None):
         if data is None:
@@ -28,8 +30,40 @@ class ContractWorkflowTests(unittest.TestCase):
     def test_health_and_bootstrap_expose_services_and_seed_counts(self):
         self.assertEqual(api.health()["status"], "ready")
         result = api.bootstrap()
-        self.assertEqual(result["counts"]["clients"], 3)
+        self.assertEqual(result["counts"]["clients"], 2)
+        self.assertEqual(
+            {client["name"] for client in result["clients"]},
+            {"Northstar Fleet Services", "Blue River Logistics"},
+        )
         self.assertEqual(len(result["services"]), 13)
+        northstar = next(client for client in result["clients"] if client["id"] == "C-1001")
+        self.assertEqual(northstar["legal_name"], "Northstar Fleet Services, LLC")
+        self.assertEqual(northstar["entity_type"], "limited liability company")
+        self.assertEqual(northstar["formation_jurisdiction"], "Delaware")
+        self.assertEqual(northstar["registered_address"], "100 Sample Way, Dover, Delaware 19901")
+        agreements = domain.list_agreements()
+        self.assertEqual(len(agreements), 4)
+        for agreement in agreements:
+            sample = PROJECT_ROOT / "samples" / "contracts" / (
+                "Northstar_Fleet_Services" if agreement["client_id"] == "C-1001" else "Blue_River_Logistics"
+            ) / agreement["filename"]
+            self.assertEqual(Path(agreement["file_path"]).read_bytes(), sample.read_bytes())
+        with connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM pricing_components").fetchone()[0], 0)
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM billing_documents").fetchone()[0], 0)
+
+    def test_bootstrap_hides_clients_without_active_readable_contract_pdfs(self):
+        with connect() as db:
+            db.execute("INSERT INTO clients(id,name) VALUES ('C-EMPTY','Empty Client')")
+            db.execute(
+                """INSERT INTO agreements
+                   (id,client_id,agreement_type,version_label,filename,file_path,effective_date,uploaded_by,extracted_json,status)
+                   VALUES ('EMPTY-MSA','C-EMPTY','MSA','1.0','missing.pdf','missing.pdf','2026-01-01','seed','{}','review')"""
+            )
+
+        client_ids = {client["id"] for client in api.bootstrap()["clients"]}
+
+        self.assertEqual(client_ids, {"C-1001", "C-1002"})
 
     def test_client_lookup_and_not_found(self):
         actor = Identity("finance.alex", "finance", "user")
@@ -61,19 +95,58 @@ class ContractWorkflowTests(unittest.TestCase):
         self.assertEqual(mla["extracted"]["lease"]["vehicle_model"], "Transit")
         self.assertIn(msa["id"], {row["id"] for row in domain.list_agreements("C-1001")})
 
-    def test_test_client_accepts_both_standalone_upload_samples(self):
-        folder = PROJECT_ROOT / "samples/test_uploads/Test_Client"
+    def test_two_demo_clients_accept_their_checked_in_contract_samples(self):
+        northstar = PROJECT_ROOT / "samples/contracts/Northstar_Fleet_Services"
+        blue_river = PROJECT_ROOT / "samples/contracts/Blue_River_Logistics"
         msa = run_upload(domain.store_upload(
-            "C-TEST", None, self.upload("test_client_msa_v1.pdf", (folder / "test_client_msa_v1.pdf").read_bytes()),
+            "C-1001", None, self.upload("northstar_msa_v1.pdf", (northstar / "northstar_msa_v1.pdf").read_bytes()),
             "structuring:lee",
         ))
         mla = run_upload(domain.store_upload(
-            "C-TEST", None, self.upload("test_client_mla_v1.pdf", (folder / "test_client_mla_v1.pdf").read_bytes()),
+            "C-1002", None, self.upload("blueriver_mla_v1.pdf", (blue_river / "blueriver_mla_v1.pdf").read_bytes()),
             "structuring:lee",
         ))
         self.assertEqual((msa["agreement_type"], mla["agreement_type"]), ("MSA", "MLA"))
         self.assertEqual(len(msa["extracted"]["services"]), 13)
         self.assertEqual(mla["extracted"]["lease"]["quantity"], 300)
+        self.assertEqual(api.get_client("C-1001", Identity("structuring.lee", "structuring", "user"))["legal_name"],
+                         "Northstar Fleet Services, LLC")
+
+    def test_draft_upload_detects_stacked_client_metadata_and_syncs_profile_on_finalize(self):
+        sample = PROJECT_ROOT / "samples/contracts/Northstar_Fleet_Services/northstar_msa_v1.pdf"
+        actor = Identity("structuring.lee", "structuring", "user")
+        draft = run_upload(api.upload_draft(self.upload(sample.name, sample.read_bytes()), actor))
+
+        self.assertEqual(draft["detected_client_name"], "Northstar Fleet Services")
+        self.assertEqual(draft["detected_client_id"], "C-1001")
+        domain.update_agreement_identifiers(draft["id"], "C-1001", "MSA", "structuring:lee")
+        client = api.get_client("C-1001", actor)
+        self.assertEqual(client["legal_name"], "Northstar Fleet Services, LLC")
+
+    def test_draft_upload_accepts_new_client_and_saves_it_with_the_agreement(self):
+        sample = PROJECT_ROOT / "samples/test_uploads/Test_Client/test_client_msa_v1.pdf"
+        actor = Identity("structuring.lee", "structuring", "user")
+        draft = run_upload(api.upload_draft(self.upload(sample.name, sample.read_bytes()), actor))
+        self.assertEqual(draft["detected_client_name"], "Test Client")
+        self.assertTrue(draft["is_new_client"])
+        self.assertEqual(draft["detected_agreement_type"], "MSA")
+        self.assertEqual(draft["extracted"]["services"][0]["service_name"], "Fuel")
+        self.assertEqual(
+            {client["name"] for client in api.bootstrap()["clients"]},
+            {"Northstar Fleet Services", "Blue River Logistics"},
+        )
+        saved = domain.update_agreement_identifiers(
+            draft["id"], draft["detected_client_id"], "MSA",
+            "structuring:lee", "Test Client",
+        )
+        self.assertEqual(saved["status"], "review")
+        self.assertTrue(saved["is_active"])
+        self.assertIn(
+            ("Test Client", draft["detected_client_id"]),
+            {(client["name"], client["id"]) for client in api.bootstrap()["clients"]},
+        )
+        with connect() as db:
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM agreements WHERE status='draft'").fetchone()[0], 0)
 
     def test_agreement_type_is_detected_from_titles_when_not_declared(self):
         self.assertEqual(detect_agreement_type(["MASTER SERVICES AGREEMENT", "Fleet service charges"]), "MSA")
@@ -132,13 +205,17 @@ class ContractWorkflowTests(unittest.TestCase):
             domain.update_extracted_terms("missing", {})
 
     def test_save_version_archives_old_and_creates_new_version_with_regenerated_pdf(self):
-        agreements = domain.list_agreements("C-1001")
-        agreement = agreements[0]  # This is an MSA
+        agreement = next(
+            item for item in domain.list_agreements("C-1001") if item["agreement_type"] == "MSA"
+        )
         original_path = Path(agreement["file_path"])
         self.assertTrue(original_path.is_file())
+        original_pages = extract_pdf_pages(original_path)
+        changed_schedule_page = agreement["extracted"]["services"][0]["evidence_page"] - 1
 
         new_terms = dict(agreement["extracted"])
-        new_terms["services"] = [dict(new_terms["services"][0], contract_amount=9.99)]
+        new_terms["services"] = [dict(service) for service in new_terms["services"]]
+        new_terms["services"][0]["contract_amount"] = 9.99
 
         saved = domain.save_agreement_version(
             agreement["id"], new_terms, "regen-test", "structuring:lee",
@@ -151,6 +228,12 @@ class ContractWorkflowTests(unittest.TestCase):
         self.assertEqual(saved["update_comment"], "regen-test")
         self.assertEqual(saved["extracted"]["services"][0]["contract_amount"], 9.99)
         self.assertTrue(Path(saved["file_path"]).is_file())
+        updated_pages = extract_pdf_pages(Path(saved["file_path"]))
+        self.assertEqual(len(updated_pages), len(original_pages))
+        self.assertIn("USD 9.99", updated_pages[changed_schedule_page])
+        for index, (original, updated) in enumerate(zip(original_pages, updated_pages)):
+            if index not in {0, changed_schedule_page}:
+                self.assertEqual(updated, original)
 
         all_versions = domain.list_agreements("C-1001", active_only=False)
         msa_versions = [row for row in all_versions if row["id"] == agreement["id"] or row["id"] == saved["id"]]
@@ -165,6 +248,36 @@ class ContractWorkflowTests(unittest.TestCase):
         archived = [row for row in msa_versions if row["is_active"] == 0]
         self.assertEqual(len(archived), 1)
         self.assertEqual(archived[0]["status"], "archived")
+
+    def test_save_mla_version_changes_only_edited_source_pdf_value(self):
+        agreement = next(a for a in domain.list_agreements("C-1001") if a["agreement_type"] == "MLA")
+        extracted = dict(agreement["extracted"])
+        lease = dict(extracted["lease"])
+        vehicles = [dict(vehicle) for vehicle in lease["vehicles"]]
+        original_pages = extract_pdf_pages(Path(agreement["file_path"]))
+        vehicles[0]["contract_amount"] = 1299.5
+        vehicles[0]["quantity"] = 450
+        vehicles[0]["rate_unit"] = "vehicle_week"
+        lease["vehicles"] = vehicles
+        extracted["lease"] = lease
+
+        saved = domain.save_agreement_version(
+            agreement["id"], extracted, "change lease rate", "structuring:lee",
+        )
+
+        saved_vehicles = saved["extracted"]["lease"]["vehicles"]
+        self.assertEqual(len(saved_vehicles), 1)
+        self.assertEqual(saved_vehicles[0]["contract_amount"], 1299.5)
+        self.assertEqual(saved_vehicles[0]["quantity"], 450)
+        self.assertEqual(saved_vehicles[0]["rate_unit"], "vehicle_week")
+        pages = extract_pdf_pages(Path(saved["file_path"]))
+        self.assertEqual(len(pages), len(original_pages))
+        for index, (original, updated) in enumerate(zip(original_pages, pages)):
+            if index not in {0, 8}:
+                self.assertEqual(updated, original)
+        self.assertIn("USD 1,299.50", pages[8])
+        self.assertIn("450 vehicle week", pages[8])
+        self.assertIn(saved_vehicles[0]["source_text"], pages[saved_vehicles[0]["evidence_page"] - 1])
 
     def test_save_version_unknown_agreement_returns_value_error(self):
         with self.assertRaisesRegex(ValueError, "Agreement not found"):

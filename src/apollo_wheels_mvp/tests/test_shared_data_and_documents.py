@@ -10,8 +10,8 @@ from pypdf import PdfWriter
 
 from apollo_wheels_mvp.catalog import SERVICES
 from apollo_wheels_mvp.documents import (
-    extract_pdf_pages, extract_pdf_text, parse_billing_rows, parse_extra_components,
-    parse_key_values, parse_lease_row, parse_service_rows,
+    extract_pdf_pages, extract_pdf_text, parse_billing_rows, parse_extra_components, patch_pdf_text_fragments,
+    parse_key_values, parse_lease_row, parse_lease_rows, parse_service_rows,
 )
 from apollo_wheels_mvp.seed import seed_demo_data
 from apollo_wheels_mvp.storage import connect, initialize
@@ -33,6 +33,23 @@ class SharedDataAndDocumentTests(unittest.TestCase):
         path.write_bytes(make_text_pdf(["FIRST: value", "second line"]))
         self.assertIn("FIRST: value", extract_pdf_text(path))
         self.assertEqual(len(extract_pdf_pages(path)), 1)
+
+    def test_pdf_text_patch_changes_one_marked_value_and_keeps_other_pages(self):
+        source = PROJECT_ROOT / "samples/contracts/Northstar_Fleet_Services/northstar_msa_v1.pdf"
+        target = self.root / "patched.pdf"
+        original_pages = extract_pdf_pages(source)
+
+        patch_pdf_text_fragments(source, target, {
+            4: [("Service code: FUEL.", [("USD 3.50", "USD 9.99")])],
+        })
+
+        updated_pages = extract_pdf_pages(target)
+        self.assertIn("USD 9.99", updated_pages[3])
+        self.assertNotIn("USD 3.50", updated_pages[3])
+        self.assertIn("Because this Service is included", updated_pages[3])
+        for index, (original, updated) in enumerate(zip(original_pages, updated_pages)):
+            if index != 3:
+                self.assertEqual(updated, original)
 
     def test_key_value_parser_ignores_lines_without_colon_and_normalizes_keys(self):
         self.assertEqual(parse_key_values("invoice_number: 7\nnot metadata\nPeriod_Start: 2026-01-01"),
@@ -63,6 +80,31 @@ class SharedDataAndDocumentTests(unittest.TestCase):
         self.assertIsNone(parse_lease_row("LEASE|short"))
         with self.assertRaises(ValueError):
             parse_lease_row("LEASE|LEASE-01|Lease|bad|vehicle_month|650|48|2026-01-01")
+
+    def test_lease_parser_preserves_each_vehicle_type_and_rate(self):
+        rows = "\n".join((
+            "LEASE|LEASE-01|Light vehicle|100|vehicle_month|700.00|36|2026-01-01|monthly|1|Ford|Transit|Hybrid|USD",
+            "LEASE|LEASE-02|Heavy vehicle|25|vehicle_month|1200.00|48|2026-01-01|monthly|1|Chevrolet|Silverado|Diesel|USD",
+        ))
+
+        parsed = parse_lease_rows(rows)
+
+        self.assertEqual(len(parsed), 2)
+        self.assertEqual([item["vehicle_model"] for item in parsed], ["Transit", "Silverado"])
+        self.assertEqual([item["contract_amount"] for item in parsed], [700.0, 1200.0])
+
+    def test_lease_parser_reads_multiple_visible_table_rows_and_decimal_quantities(self):
+        text = (
+            "Vehicle and lease schedule Asset Description Quantity Monthly rate Term Effective "
+            "LEASE-01 Ford Transit (Hybrid) 500.0 vehicle month USD 1,299.50 48 months 2026-01-01 "
+            "LEASE-02 Chevrolet Silverado (Diesel) 25 vehicle month USD 1,500.00 48 months 2026-01-01"
+        )
+
+        parsed = parse_lease_rows(text)
+
+        self.assertEqual([item["vehicle_model"] for item in parsed], ["Transit", "Silverado"])
+        self.assertEqual([item["quantity"] for item in parsed], [500.0, 25.0])
+        self.assertEqual([item["contract_amount"] for item in parsed], [1299.5, 1500.0])
 
     def test_billing_parser_reads_all_fields_and_skips_malformed_line(self):
         line = "LINE|LEASE|LEASE-01|Lease|monthly_lease|recurring|500|650.00|vehicle_month|325000.00"

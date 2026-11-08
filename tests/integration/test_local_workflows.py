@@ -55,15 +55,18 @@ class LocalWorkflowTests(unittest.TestCase):
         storage.DOCUMENT_DIR = root / "documents"
         seed.DOCUMENT_DIR = storage.DOCUMENT_DIR
         storage.initialize()
-        seed.seed_demo_data()
+        seed.seed_demo_data(include_workflow_history=True)
 
     def tearDown(self):
         self.temp_dir.cleanup()
 
     def test_seed_creates_a_complete_local_demo_dataset(self):
         with database() as db:
-            self.assertEqual(db.execute("SELECT COUNT(*) FROM clients").fetchone()[0], 3)
-            self.assertEqual(db.execute("SELECT name FROM clients WHERE id='C-TEST'").fetchone()[0], "Test Client")
+            self.assertEqual(db.execute("SELECT COUNT(*) FROM clients").fetchone()[0], 2)
+            self.assertEqual(
+                {row[0] for row in db.execute("SELECT name FROM clients")},
+                {"Northstar Fleet Services", "Blue River Logistics"},
+            )
             self.assertEqual(db.execute("SELECT COUNT(*) FROM agreements").fetchone()[0], 4)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM pricing_components").fetchone()[0], 22)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM billing_documents").fetchone()[0], 12)

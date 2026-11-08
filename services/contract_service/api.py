@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from apollo_wheels_mvp.catalog import SERVICES
+from apollo_wheels_mvp.documents import parse_key_values
 from apollo_wheels_mvp.storage import connect
 from services.auth import Identity, api_access, get_identity, require_role, require_user
 from . import domain
@@ -31,6 +32,7 @@ class VersionSave(BaseModel):
 class IdentifiersUpdate(BaseModel):
     client_id: str
     agreement_type: str
+    client_name: str | None = None
 
 
 @public_router.get("/")
@@ -41,7 +43,18 @@ def health():
 @router.get("/api/bootstrap")
 def bootstrap():
     with connect() as db:
-        clients = [dict(row) for row in db.execute("SELECT * FROM clients ORDER BY name").fetchall()]
+        client_rows = db.execute(
+            """SELECT c.*, a.file_path FROM clients c
+               JOIN agreements a ON a.client_id=c.id
+               WHERE a.is_active=1 ORDER BY c.name"""
+        ).fetchall()
+        clients_by_id = {}
+        for row in client_rows:
+            if Path(row["file_path"]).is_file():
+                clients_by_id.setdefault(
+                    row["id"], {key: row[key] for key in row.keys() if key != "file_path"}
+                )
+        clients = list(clients_by_id.values())
         counts = {
             "clients": len(clients),
             "agreements": db.execute("SELECT COUNT(*) FROM agreements WHERE is_active=1").fetchone()[0],
@@ -126,26 +139,45 @@ async def upload_draft(
         extracted = extract_agreement_terms(pages, detected_type)
 
         # Try to find client name from text
-        values = {}
-        for line in text.splitlines():
-            if ":" in line:
-                key, value = line.split(":", 1)
-                values[key.strip().upper()] = value.strip()
-        client_name = values.get("CLIENT_NAME", "")
-        # Try to map to existing client
-        with connect() as db:
-            client = db.execute("SELECT id, name FROM clients WHERE name=?", (client_name,)).fetchone()
-            client_id = client["id"] if client else None
+        values = parse_key_values(text)
+        client_name = values.get("CLIENT_NAME", "").strip()
+        if not client_name:
+            parties = extracted.get("parties")
+            client_party = parties.get("client") if isinstance(parties, dict) else None
+            if isinstance(client_party, dict):
+                client_name = str(client_party.get("legal_name") or "").strip()
+        if not client_name:
+            raise HTTPException(
+                status_code=422,
+                detail="Could not detect a client name in this agreement.",
+            )
 
-        # Store draft in DB (inactive, so it doesn't appear in normal listings)
+        # Reuse an existing client when names match, otherwise stage a new one
+        # so the inactive agreement draft can retain its required client link.
         with connect() as db:
+            clients = db.execute("SELECT id, name FROM clients").fetchall()
+            normalize = lambda value: re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+            client = next(
+                (row for row in clients if normalize(row["name"]) == normalize(client_name)),
+                None,
+            )
+            if client is None:
+                client_id = str(uuid.uuid4())
+                db.execute(
+                    "INSERT INTO clients (id, name) VALUES (?, ?)",
+                    (client_id, client_name),
+                )
+            else:
+                client_id = client["id"]
+            # Store draft in DB (inactive, so it doesn't appear in normal listings).
             db.execute(
                 """INSERT INTO agreements
                    (id, client_id, agreement_type, version_label, filename, file_path,
                     effective_date, status, uploaded_by, extracted_json, version, is_active)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (draft_id, client_id or "C-TEST", detected_type, "1.0", file.filename, str(path),
-                 "2026-01-01", "draft", f"{actor.role}:{actor.subject}", json.dumps(extracted), 1, 0),
+                (draft_id, client_id, detected_type, values.get("VERSION", "1.0"), file.filename, str(path),
+                 values.get("EFFECTIVE_DATE", "2026-01-01"), "draft", f"{actor.role}:{actor.subject}",
+                 json.dumps(extracted), 1, 0),
             )
 
         return {
@@ -154,12 +186,13 @@ async def upload_draft(
             "temp_file_path": str(path),
             "detected_client_id": client_id,
             "detected_client_name": client_name,
+            "is_new_client": client is None,
             "detected_agreement_type": detected_type,
             "extracted": extracted,
             "agreement_type": detected_type,
             "version_label": "1.0",
             "status": "draft",
-            "client_id": client_id or "C-TEST",
+            "client_id": client_id,
         }
     except Exception:
         path.unlink(missing_ok=True)
@@ -175,7 +208,8 @@ def update_identifiers(
     """Update client_id and agreement_type for an uploaded agreement (draft or final)."""
     require_user(actor)
     return domain.update_agreement_identifiers(
-        agreement_id, payload.client_id, payload.agreement_type, f"{actor.role}:{actor.subject}"
+        agreement_id, payload.client_id, payload.agreement_type, f"{actor.role}:{actor.subject}",
+        payload.client_name,
     )
 
 

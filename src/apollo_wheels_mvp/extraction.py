@@ -9,7 +9,7 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from .catalog import SERVICES
-from .documents import parse_extra_components, parse_lease_row, parse_service_rows
+from .documents import parse_agreement_parties, parse_extra_components, parse_lease_rows, parse_service_rows
 
 
 def detect_agreement_type(pages: list[str]) -> str:
@@ -42,24 +42,30 @@ def extract_agreement_terms(pages: list[str], agreement_type: str) -> dict[str, 
     provider = os.getenv("LLM_PROVIDER", "synthetic").lower()
     if provider == "synthetic":
         text = "\n".join(pages)
+        lease_rows = parse_lease_rows(text) if agreement_type == "MLA" else []
         terms = {
             "services": parse_service_rows(text) if agreement_type == "MSA" else [],
             "components": parse_extra_components(text) if agreement_type == "MSA" else [],
-            "lease": parse_lease_row(text) if agreement_type == "MLA" else None,
+            "lease": {**lease_rows[0], "vehicles": lease_rows} if lease_rows else None,
+            "parties": parse_agreement_parties(pages, agreement_type),
             "evidence_page": 1,
             "extraction_provider": "synthetic",
         }
         evidence = terms["services"] + terms["components"]
-        if terms["lease"]:
-            evidence.append(terms["lease"])
+        evidence.extend(lease_rows)
         for item in evidence:
             for page_number, page in enumerate(pages, start=1):
                 if item["source_text"] in page:
                     item["evidence_page"] = page_number
                     break
+        if lease_rows:
+            terms["lease"].update(lease_rows[0])
+            terms["lease"]["vehicles"] = lease_rows
         return terms
     if provider == "ollama":
-        return extract_with_ollama(pages, agreement_type)
+        terms = extract_with_ollama(pages, agreement_type)
+        terms["parties"] = parse_agreement_parties(pages, agreement_type)
+        return terms
     raise ValueError(f"Unknown LLM_PROVIDER '{provider}'. Use synthetic or ollama.")
 
 
@@ -76,7 +82,7 @@ Return only JSON with keys services, components, and lease.
 For MSA, return all explicit service terms in services and separate setup/other fees in components. For MLA, return the lease object or null. Do not invent missing values; use null. Use service codes from this list when they match: {service_codes}. Otherwise use UNKNOWN.
 Each service object must include service_code, service_name, subscribed, billing_stream, component_name, contract_amount, rate_unit, charge_type, pricing_basis, billing_frequency, billing_day, vehicle_count, driver_count, source_text, evidence_page.
 Each component object must include service_code, component_name, display_name, charge_type, contract_amount, rate_unit, quantity, billing_stream, subscribed, pricing_basis, billing_frequency, billing_day, source_text, evidence_page.
-The lease object must include service_code, service_name, subscribed, billing_stream, component_name, contract_amount, rate_unit, quantity, term_months, effective_from, billing_frequency, billing_day, vehicle_make, vehicle_model, engine_type, pricing_basis, source_text, evidence_page.
+The lease object must include a vehicles list. Each vehicle object must include service_code, service_name, vehicle_type, subscribed, billing_stream, component_name, contract_amount, rate_unit, quantity, term_months, effective_from, billing_frequency, billing_day, vehicle_make, vehicle_model, engine_type, pricing_basis, source_text, evidence_page.
 source_text must be an exact short quote from one page. evidence_page is a one-based page number.
 
 DOCUMENT TEXT:\n{page_text}"""
@@ -106,16 +112,42 @@ DOCUMENT TEXT:\n{page_text}"""
         terms = json.loads(result["message"]["content"])
     except (KeyError, TypeError, json.JSONDecodeError) as exc:
         raise ValueError("Ollama returned an invalid agreement extraction response.") from exc
+    if terms.get("lease"):
+        terms["lease"] = normalize_lease_terms(terms["lease"])
     validate_terms(terms, pages, agreement_type)
     for group in ("services", "components"):
         for item in terms[group]:
             add_model_evidence(item)
     if terms.get("lease"):
-        add_model_evidence(terms["lease"])
+        for vehicle in terms["lease"]["vehicles"]:
+            add_model_evidence(vehicle)
     terms["evidence_page"] = 1
     terms["extraction_provider"] = "ollama"
     terms["extraction_model"] = model
     return terms
+
+
+def normalize_lease_terms(lease: object) -> dict[str, object]:
+    """Normalize legacy single-lease model output to the vehicle-list shape."""
+    if not isinstance(lease, dict):
+        raise ValueError("Ollama lease extraction must be an object.")
+    vehicles = lease.get("vehicles")
+    if vehicles is None:
+        vehicles = [{key: value for key, value in lease.items() if key != "vehicles"}]
+    if not isinstance(vehicles, list) or not vehicles:
+        raise ValueError("An MLA extraction must contain at least one vehicle row.")
+    for vehicle in vehicles:
+        if not isinstance(vehicle, dict):
+            raise ValueError("Each MLA vehicle row must be an object.")
+        make = vehicle.get("vehicle_make", "")
+        model = vehicle.get("vehicle_model", "")
+        engine = vehicle.get("engine_type", "")
+        if not vehicle.get("vehicle_type"):
+            vehicle_type = " ".join(str(value) for value in (make, model) if value).strip()
+            vehicle["vehicle_type"] = f"{vehicle_type} ({engine})" if vehicle_type and engine else vehicle_type or engine
+    lease.update(vehicles[0])
+    lease["vehicles"] = vehicles
+    return lease
 
 
 def validate_terms(terms: object, pages: list[str], agreement_type: str) -> None:
@@ -128,6 +160,8 @@ def validate_terms(terms: object, pages: list[str], agreement_type: str) -> None
         raise ValueError("An MSA extraction cannot include a lease object.")
     if agreement_type == "MLA" and (terms["services"] or terms["components"]):
         raise ValueError("An MLA extraction cannot include MSA service terms.")
+    if agreement_type == "MLA" and terms.get("lease") is not None and not isinstance(terms["lease"], dict):
+        raise ValueError("An MLA lease extraction must be an object.")
     codes = {item["code"] for item in SERVICES}
     required_fields = {
         "services": {"service_code", "service_name", "subscribed", "billing_stream", "component_name",
@@ -141,15 +175,20 @@ def validate_terms(terms: object, pages: list[str], agreement_type: str) -> None
         for item in terms[group]:
             check_extracted_item(item, required_fields[group], codes, pages, "SERVICE")
     if terms.get("lease"):
-        check_extracted_item(
-            terms["lease"],
-            {"service_code", "service_name", "subscribed", "billing_stream", "component_name",
-             "contract_amount", "rate_unit", "quantity", "term_months", "effective_from", "billing_frequency",
-             "billing_day", "vehicle_make", "vehicle_model", "engine_type", "pricing_basis", "source_text", "evidence_page"},
-            codes,
-            pages,
-            "LEASE",
-        )
+        lease = terms["lease"]
+        vehicles = lease.get("vehicles") or [lease]
+        if not isinstance(vehicles, list) or not vehicles:
+            raise ValueError("An MLA extraction must contain at least one vehicle row.")
+        for vehicle in vehicles:
+            check_extracted_item(
+                vehicle,
+                {"service_code", "service_name", "vehicle_type", "subscribed", "billing_stream", "component_name",
+                 "contract_amount", "rate_unit", "quantity", "term_months", "effective_from", "billing_frequency",
+                 "billing_day", "vehicle_make", "vehicle_model", "engine_type", "pricing_basis", "source_text", "evidence_page"},
+                codes,
+                pages,
+                "LEASE",
+            )
 
 
 def check_extracted_item(
@@ -165,7 +204,9 @@ def check_extracted_item(
         raise ValueError("Extracted service codes and names must be text.")
     if not isinstance(item["subscribed"], bool):
         raise ValueError("Extracted subscribed values must be true or false.")
-    if item["service_code"] not in codes | {"UNKNOWN", "LEASE-01"}:
+    if item["service_code"] not in codes | {"UNKNOWN", "LEASE-01"} and not (
+        expected_stream == "LEASE" and item["service_code"].startswith("LEASE-")
+    ):
         item["service_code"] = "UNKNOWN"
     if item["billing_stream"] != expected_stream:
         raise ValueError(f"Extracted billing stream must be {expected_stream} for this agreement type.")

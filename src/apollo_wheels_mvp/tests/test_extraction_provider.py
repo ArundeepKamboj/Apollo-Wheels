@@ -9,7 +9,9 @@ import unittest
 from unittest.mock import patch
 
 from apollo_wheels_mvp.documents import extract_pdf_pages
-from apollo_wheels_mvp.extraction import extract_agreement_terms, extract_with_ollama, validate_terms
+from apollo_wheels_mvp.extraction import (
+    extract_agreement_terms, extract_with_ollama, normalize_lease_terms, validate_terms,
+)
 from services.test_support import PROJECT_ROOT
 
 
@@ -34,7 +36,7 @@ class ExtractionProviderTests(unittest.TestCase):
         cls.pages = extract_pdf_pages(path)
         cls.source_page, cls.source_row = next(
             (index, line) for index, page in enumerate(cls.pages, start=1)
-            for line in page.splitlines() if line.startswith("SERVICE|FUEL|")
+            for line in page.splitlines() if "Service code: FUEL." in line
         )
 
     def service_item(self, **changes):
@@ -62,12 +64,31 @@ class ExtractionProviderTests(unittest.TestCase):
         self.assertEqual(msa_terms["extraction_provider"], "synthetic")
         self.assertGreaterEqual(mla_terms["lease"]["evidence_page"], 2)
         self.assertEqual(msa_terms["services"][0]["evidence_page"], self.source_page)
-        self.assertIn("LEASE|", mla_terms["lease"]["source_text"])
+        self.assertIn("LEASE-01", mla_terms["lease"]["source_text"])
+        self.assertIn(mla_terms["lease"]["source_text"], "\n".join(mla))
+        self.assertEqual(mla_terms["lease"]["vehicles"][0]["vehicle_model"], "Transit")
+        self.assertEqual(msa_terms["parties"]["client"]["legal_name"], "Northstar Fleet Services, LLC")
+        self.assertEqual(msa_terms["parties"]["client"]["formation_jurisdiction"], "Delaware")
 
     def test_unknown_provider_is_rejected(self):
         with patch.dict(os.environ, {"LLM_PROVIDER": "unsupported"}):
             with self.assertRaisesRegex(ValueError, "Unknown LLM_PROVIDER"):
                 extract_agreement_terms(self.pages, "MSA")
+
+    def test_legacy_single_lease_normalization_keeps_engine_in_vehicle_type(self):
+        lease = {
+            "service_code": "LEASE-01", "service_name": "Fleet vehicle lease", "subscribed": True,
+            "billing_stream": "LEASE", "component_name": "monthly_lease", "contract_amount": 1200.0,
+            "rate_unit": "vehicle_month", "quantity": 500, "term_months": 48,
+            "effective_from": "2026-01-01", "billing_frequency": "monthly", "billing_day": "1",
+            "vehicle_make": "Ford", "vehicle_model": "Transit", "engine_type": "Hybrid",
+            "pricing_basis": "USD", "source_text": "lease quote", "evidence_page": 1,
+        }
+
+        normalized = normalize_lease_terms(lease)
+
+        self.assertEqual(normalized["vehicles"][0]["vehicle_type"], "Ford Transit (Hybrid)")
+        self.assertEqual(normalized["contract_amount"], 1200.0)
 
     def test_valid_ollama_response_is_validated_and_marked_uncalibrated(self):
         with patch("apollo_wheels_mvp.extraction.urlopen", self._urlopen(self.model_response())):
