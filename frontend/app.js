@@ -714,23 +714,33 @@ async function renderContracts() {
       const clientId = client?.id || selected.client_id;
       const clientName = client?.name || selected.detected_client_name || "Unknown Client";
       const agreementType = selected.agreement_type;
-      try {
-        const forecast = await api(
-          `/api/clients/${clientId}/billing-forecast?${new URLSearchParams({ start, end, stream })}`
-        );
-        state.forecastPreview = {
-          clientId,
-          clientName,
-          agreementType,
-          start,
-          end,
-          stream,
-          data: forecast,
-        };
-        renderContracts();
-      } catch (e) {
-        notify(e.message);
+
+      let forecast;
+      if (isDraft) {
+        // For drafts, compute forecast from extracted contract terms
+        forecast = computeForecastFromContract(selected, start, end);
+      } else {
+        // For existing agreements, use active pricing from billing service
+        try {
+          forecast = await api(
+            `/api/clients/${clientId}/billing-forecast?${new URLSearchParams({ start, end, stream })}`
+          );
+        } catch (e) {
+          // Fallback to contract-based forecast if pricing API fails
+          forecast = computeForecastFromContract(selected, start, end);
+        }
       }
+
+      state.forecastPreview = {
+        clientId,
+        clientName,
+        agreementType,
+        start,
+        end,
+        stream,
+        data: forecast,
+      };
+      renderContracts();
     };
   }
 
@@ -765,6 +775,105 @@ function renderEvidence(item, field) {
     ? `<div class="small muted">${esc(confidenceLabel(item, field))}</div>`
     : "";
   return evidenceHtml + confidenceHtml;
+}
+
+function computeForecastFromContract(agreement, periodStart, periodEnd) {
+  // Compute forecast billing from extracted contract terms (for drafts/previews)
+  const extracted = agreement.extracted || {};
+  const lines = [];
+  let total = 0.0;
+
+  // Process MSA services
+  if (extracted.services) {
+    for (const service of extracted.services) {
+      if (!service.subscribed) continue;
+      if (service.contract_amount == null) continue;
+
+      const quantity = service.vehicle_count || service.driver_count || 1;
+      const amount = Number(service.contract_amount) * quantity;
+      total += amount;
+
+      lines.push({
+        service_code: service.service_code,
+        service_name: service.service_name,
+        component_code: service.component_name || "monthly_per_vehicle",
+        component_name: service.component_name ? service.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "Monthly Service",
+        billing_stream: "SERVICE",
+        charge_type: "recurring",
+        quantity: quantity,
+        rate: Number(service.contract_amount),
+        rate_unit: service.rate_unit || "vehicle_month",
+        amount: amount,
+        currency: service.pricing_basis || "USD",
+      });
+    }
+  }
+
+  // Process MSA components (one-time charges like FUEL activation)
+  if (extracted.components) {
+    for (const component of extracted.components) {
+      if (component.contract_amount == null) continue;
+
+      const quantity = component.quantity || 1;
+      const amount = Number(component.contract_amount) * quantity;
+      total += amount;
+
+      lines.push({
+        service_code: component.service_code || "FUEL",
+        service_name: component.service_name || "Fuel",
+        component_code: component.component_name || "activation",
+        component_name: component.component_name ? component.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "One-time Setup",
+        billing_stream: "SERVICE",
+        charge_type: component.charge_type || "one_time",
+        quantity: quantity,
+        rate: Number(component.contract_amount),
+        rate_unit: component.rate_unit || "account",
+        amount: amount,
+        currency: component.pricing_basis || "USD",
+      });
+    }
+  }
+
+  // Process MLA lease
+  if (extracted.lease) {
+    const lease = extracted.lease;
+    const vehicles = lease.vehicles?.length ? lease.vehicles : [lease];
+
+    for (const vehicle of vehicles) {
+      if (vehicle.contract_amount == null) continue;
+
+      const quantity = vehicle.quantity || 1;
+      const amount = Number(vehicle.contract_amount) * quantity;
+      total += amount;
+
+      const vehicleType = vehicle.vehicle_type ||
+        [vehicle.vehicle_make, vehicle.vehicle_model].filter(Boolean).join(" ");
+
+      lines.push({
+        service_code: vehicle.service_code || "LEASE-01",
+        service_name: vehicle.service_name || "Fleet vehicle lease",
+        component_code: vehicle.component_name || "monthly_lease",
+        component_name: `Monthly Lease - ${vehicleType || "Vehicle"}`,
+        billing_stream: "LEASE",
+        charge_type: "recurring",
+        quantity: quantity,
+        rate: Number(vehicle.contract_amount),
+        rate_unit: vehicle.rate_unit || "vehicle_month",
+        amount: amount,
+        currency: vehicle.pricing_basis || "USD",
+      });
+    }
+  }
+
+  return {
+    client_id: agreement.client_id || agreement.detected_client_id,
+    period_start: periodStart,
+    period_end: periodEnd,
+    billing_stream: "COMBINED",
+    lines: lines,
+    total: Math.round(total * 100) / 100,
+    line_count: lines.length,
+  };
 }
 
 function renderForecastPreviewModal() {
