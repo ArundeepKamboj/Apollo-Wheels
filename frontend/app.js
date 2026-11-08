@@ -906,22 +906,43 @@ async function saveTerms() {
 
     const comment = prompt("Enter update comment for audit trail:");
     if (!comment) return;
-    // Save creates a NEW version with a new ID; capture it to refresh the view
-    const saved = await api(`/api/agreements/${agreement.id}/save-version`, {
-      method: "PUT",
-      body: JSON.stringify({ extracted, update_comment: comment }),
-    });
-    // Update state to the new version so the PDF loads the regenerated version
-    state.selectedAgreement = saved.id;
-    // Refresh the agreements list to include the new version
-    if (state.contractExistingClientId && state.contractExistingAgreementType) {
-      state.agreements = await api(
-        `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`
-      );
+
+    // Show regeneration progress to user
+    const progressToast = document.createElement("div");
+    progressToast.className = "toast show";
+    progressToast.style.cssText = "background:#2a3a3a; z-index:10000;";
+    progressToast.innerHTML = `<b>PDF regeneration in progress</b><br><span class="small">Updating extracted terms and regenerating the PDF document...</span>`;
+    document.body.appendChild(progressToast);
+
+    try {
+      // Save creates a NEW version; backend regenerates PDF from extracted terms
+      const saved = await api(`/api/agreements/${agreement.id}/save-version`, {
+        method: "PUT",
+        body: JSON.stringify({ extracted, update_comment: comment }),
+      });
+
+      // Update state to the new version so the PDF loads the regenerated version
+      state.selectedAgreement = saved.id;
+      // Refresh the agreements list to include the new version
+      if (state.contractExistingClientId && state.contractExistingAgreementType) {
+        state.agreements = await api(
+          `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`
+        );
+      }
+
+      // Remove progress toast
+      document.body.removeChild(progressToast);
+      notify("New version saved with audit comment; PDF regenerated");
+      await renderContracts();
+    } catch (error) {
+      // Remove progress toast on error
+      if (progressToast.parentNode) {
+        document.body.removeChild(progressToast);
+      }
+      notify(error.message);
     }
-    notify("New version saved with audit comment");
-    await renderContracts();
   } catch (error) {
+    if (progressToast?.parentNode) document.body.removeChild(progressToast);
     notify(error.message);
   }
 }
