@@ -41,13 +41,17 @@ test('contract workspace shows source and role-specific editing after login', as
   await expect(page.getByRole('heading', { name: 'Source document' })).toBeVisible();
   await expect(page.locator('#existing-client-picker')).toHaveValue('');
   await expect(page.locator('.pdf-page')).toHaveCount(0);
-  await expect(page.locator('#terms-editor')).toContainText('Select a client');
+  await expect(page.locator('#terms-editor')).toContainText('Select an existing client');
   await expect(page.locator('#download-agreement')).toHaveCount(0);
-  await expect(page.locator('#agreement-upload button')).toBeDisabled();
+  await expect(page.locator('#agreement-upload')).toHaveCount(0);
   let unsolicitedDownload = false;
   page.on('download', () => { unsolicitedDownload = true; });
   await page.locator('#existing-client-picker').selectOption('C-1001');
-  await expect(page.locator('#agreement-upload button')).toBeEnabled();
+  await expect(page.locator('#existing-agreement-type')).toHaveValue('');
+  await expect(page.locator('#fetch-agreement')).toBeDisabled();
+  await page.locator('#existing-agreement-type').selectOption('MSA');
+  await expect(page.locator('#fetch-agreement')).toBeEnabled();
+  await page.locator('#fetch-agreement').click();
   await expect(page.locator('#pdf-viewer')).toHaveAttribute('data-state', 'ready');
   const pageCount = Number(await page.locator('#pdf-viewer').getAttribute('data-page-count'));
   await expect(page.locator('.pdf-page')).toHaveCount(pageCount);
@@ -63,10 +67,16 @@ test('contract workspace shows source and role-specific editing after login', as
   expect((await download).suggestedFilename()).toContain('msa');
   await expect(page.locator('#save-terms')).toBeDisabled();
   await signIn(page, 'teststructurer', 'StructuringDemo!2026');
+  // Navigate away then back so the picker resets (go() resets only when arriving
+  // from a different page).
+  await page.locator('.nav[data-page="overview"]').click();
   await page.locator('.nav[data-page="contracts"]').click();
   await expect(page.locator('#existing-client-picker')).toHaveValue('');
   await page.locator('#existing-client-picker').selectOption('C-1001');
+  await page.locator('#existing-agreement-type').selectOption('MSA');
+  await page.locator('#fetch-agreement').click();
   await expect(page.locator('#save-terms')).toBeEnabled();
+  await expect(page.locator('#terms-editor')).toContainText('Evidence - page');
   await expect(page.locator('#terms-editor')).toContainText('Evidence - page');
   const panelHeights = await page.locator('.contract-panel').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height));
   expect(Math.abs(panelHeights[0] - panelHeights[1])).toBeLessThan(2);
@@ -79,21 +89,23 @@ test('agreement upload identifies MSA or MLA and displays extracted fields', asy
   await openWorkspace(page);
   await signIn(page, 'teststructurer', 'StructuringDemo!2026');
   await page.locator('.nav[data-page="contracts"]').click();
-  await page.locator('#upload-client-picker').selectOption('C-TEST');
-  await expect(page.locator('select[name="agreement_type"] option')).toHaveText(['Auto-detect', 'MSA', 'MLA']);
+  await page.locator('#tab-upload').click();
+  await expect(page.locator('#agreement-upload')).toBeVisible();
+  await expect(page.locator('#agreement-upload input[type="file"]')).toBeEnabled();
 
-  for (const [file, selection, type, field] of [
-    [sampleMsa, 'MSA', 'MSA', 'Fuel'],
-    [sampleMla, 'MLA', 'MLA', 'Lease term'],
-    [sampleMsa, '', 'MSA', 'Fuel'],
+  for (const [file, type, field] of [
+    [sampleMsa, 'MSA', 'Fuel'],
+    [sampleMla, 'MLA', 'Lease term'],
   ]) {
-    await page.locator('select[name="agreement_type"]').selectOption(selection);
     await page.locator('#agreement-upload input[type="file"]').setInputFiles(file);
-    await expect(page.locator('#existing-client-picker')).toHaveValue('');
     await page.locator('#agreement-upload button').click();
     await expect(page.locator('#toast')).toContainText(`${type} identified`);
+    // The uploaded PDF must render on the left even though it is a draft
+    // (selectedAgreement stays null; the draft lives in uploadedAgreement).
     await expect(page.locator('#pdf-viewer')).toHaveAttribute('data-state', 'ready');
-    await expect(page.locator('.pdf-text-layer span').first()).toBeVisible();
+    await expect(page.locator('.pdf-page').first()).toBeVisible();
+    // Text layer spans are rendered by PDF.js; check that the first non-empty span is present.
+    await expect(page.locator('.pdf-text-layer span').filter({ hasText: /.+/ }).first()).toBeVisible();
     await expect(page.locator('#terms-editor')).toContainText(type);
     await expect(page.locator('#terms-editor')).toContainText(field);
     if (type === 'MSA') {
@@ -101,11 +113,6 @@ test('agreement upload identifies MSA or MLA and displays extracted fields', asy
       await expect(page.locator('.pdf-text-highlight').first()).toBeVisible();
     }
   }
-
-  await page.locator('select[name="agreement_type"]').selectOption('MSA');
-  await page.locator('#agreement-upload input[type="file"]').setInputFiles(sampleMla);
-  await page.locator('#agreement-upload button').click();
-  await expect(page.locator('#toast')).toContainText('identified as MLA, not MSA');
 });
 
 test('Finance pricing request requires a different authenticated Finance approver', async ({ page }) => {

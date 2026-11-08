@@ -23,6 +23,16 @@ class InvoiceHistorySetting(BaseModel):
     enabled: bool
 
 
+class VersionSave(BaseModel):
+    extracted: dict[str, object]
+    update_comment: str
+
+
+class IdentifiersUpdate(BaseModel):
+    client_id: str
+    agreement_type: str
+
+
 @public_router.get("/")
 def health():
     return {"service": "contract-api", "status": "ready", "docs": "/docs"}
@@ -34,7 +44,7 @@ def bootstrap():
         clients = [dict(row) for row in db.execute("SELECT * FROM clients ORDER BY name").fetchall()]
         counts = {
             "clients": len(clients),
-            "agreements": db.execute("SELECT COUNT(*) FROM agreements").fetchone()[0],
+            "agreements": db.execute("SELECT COUNT(*) FROM agreements WHERE is_active=1").fetchone()[0],
             "pending_approvals": db.execute("SELECT COUNT(*) FROM pricing_approval_requests WHERE status='pending_approval'").fetchone()[0],
             "active_pricing_components": db.execute("SELECT COUNT(*) FROM pricing_components WHERE status='active'").fetchone()[0],
             "billing_invoices": db.execute("SELECT COUNT(*) FROM billing_documents").fetchone()[0],
@@ -52,8 +62,8 @@ def get_client(client_id: str, actor: Identity = Depends(get_identity)):
 
 
 @router.get("/api/clients/{client_id}/agreements")
-def client_agreements(client_id: str, actor: Identity = Depends(get_identity)):
-    return domain.list_agreements(client_id)
+def client_agreements(client_id: str, actor: Identity = Depends(get_identity), type: str | None = None):
+    return domain.list_agreements(client_id, type)
 
 
 @router.get("/api/agreements/{agreement_id}/pdf")
@@ -79,6 +89,96 @@ async def upload_agreement(
                                      f"{actor.role}:{actor.subject}")
 
 
+@router.post("/api/agreements/upload-draft")
+async def upload_draft(
+    file: UploadFile = File(...),
+    actor: Identity = Depends(get_identity),
+):
+    """Upload a PDF without specifying client/agreement_type upfront.
+    Returns extracted terms with detected client name and agreement type.
+    A draft record is created in the DB (status='draft', is_active=0); call
+    update_identifiers to finalize with client/agreement_type."""
+    require_user(actor)
+    import uuid, re, json
+    from pathlib import Path
+    from apollo_wheels_mvp.storage import DOCUMENT_DIR, connect
+    from apollo_wheels_mvp.documents import extract_pdf_pages
+    from apollo_wheels_mvp.extraction import detect_agreement_type, extract_agreement_terms
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Upload a PDF file.")
+    content = await file.read()
+    if not content.startswith(b"%PDF"):
+        raise HTTPException(status_code=400, detail="The uploaded file is not a valid PDF.")
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="PDF uploads must be 20 MB or smaller in this MVP.")
+
+    draft_id = str(uuid.uuid4())
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(file.filename).name)
+    stored_name = f"draft_{draft_id}_{safe_name}"
+    path = DOCUMENT_DIR / stored_name
+    path.write_bytes(content)
+
+    try:
+        pages = extract_pdf_pages(path)
+        text = "\n".join(pages)
+        detected_type = detect_agreement_type(pages)
+        extracted = extract_agreement_terms(pages, detected_type)
+
+        # Try to find client name from text
+        values = {}
+        for line in text.splitlines():
+            if ":" in line:
+                key, value = line.split(":", 1)
+                values[key.strip().upper()] = value.strip()
+        client_name = values.get("CLIENT_NAME", "")
+        # Try to map to existing client
+        with connect() as db:
+            client = db.execute("SELECT id, name FROM clients WHERE name=?", (client_name,)).fetchone()
+            client_id = client["id"] if client else None
+
+        # Store draft in DB (inactive, so it doesn't appear in normal listings)
+        with connect() as db:
+            db.execute(
+                """INSERT INTO agreements
+                   (id, client_id, agreement_type, version_label, filename, file_path,
+                    effective_date, status, uploaded_by, extracted_json, version, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (draft_id, client_id or "C-TEST", detected_type, "1.0", file.filename, str(path),
+                 "2026-01-01", "draft", f"{actor.role}:{actor.subject}", json.dumps(extracted), 1, 0),
+            )
+
+        return {
+            "id": draft_id,
+            "draft_id": draft_id,
+            "temp_file_path": str(path),
+            "detected_client_id": client_id,
+            "detected_client_name": client_name,
+            "detected_agreement_type": detected_type,
+            "extracted": extracted,
+            "agreement_type": detected_type,
+            "version_label": "1.0",
+            "status": "draft",
+            "client_id": client_id or "C-TEST",
+        }
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+
+
+@router.put("/api/agreements/{agreement_id}/identifiers")
+def update_identifiers(
+    agreement_id: str,
+    payload: IdentifiersUpdate,
+    actor: Identity = Depends(get_identity),
+):
+    """Update client_id and agreement_type for an uploaded agreement (draft or final)."""
+    require_user(actor)
+    return domain.update_agreement_identifiers(
+        agreement_id, payload.client_id, payload.agreement_type, f"{actor.role}:{actor.subject}"
+    )
+
+
 @router.put("/api/agreements/{agreement_id}/terms")
 def edit_terms(
     agreement_id: str,
@@ -87,6 +187,19 @@ def edit_terms(
 ):
     require_role(actor, "structuring")
     return domain.update_extracted_terms(agreement_id, payload.extracted)
+
+
+@router.put("/api/agreements/{agreement_id}/save-version")
+def save_version(
+    agreement_id: str,
+    payload: VersionSave,
+    actor: Identity = Depends(get_identity),
+):
+    """Save a new version of the agreement with an update comment (audit trail)."""
+    require_role(actor, "structuring")
+    return domain.save_agreement_version(
+        agreement_id, payload.extracted, payload.update_comment, f"{actor.role}:{actor.subject}"
+    )
 
 
 @router.put("/api/clients/{client_id}/invoice-history")

@@ -33,6 +33,26 @@ def connect() -> sqlite3.Connection:
     return db
 
 
+_AGREEMENT_MIGRATIONS = [
+    ("version", "INTEGER NOT NULL DEFAULT 1"),
+    ("is_active", "INTEGER NOT NULL DEFAULT 1"),
+    ("update_comment", "TEXT"),
+]
+
+
+def _migrate_agreements(db: sqlite3.Connection) -> None:
+    """Add versioning columns to pre-existing agreements tables.
+
+    CREATE TABLE IF NOT EXISTS does not add columns to tables that were
+    created by an older schema, so existing databases need an explicit
+    migration step when the agreement model grows.
+    """
+    columns = {row[1] for row in db.execute("PRAGMA table_info(agreements)").fetchall()}
+    for name, definition in _AGREEMENT_MIGRATIONS:
+        if name not in columns:
+            db.execute(f"ALTER TABLE agreements ADD COLUMN {name} {definition}")
+
+
 def initialize() -> None:
     with connect() as db:
         db.executescript(
@@ -55,7 +75,10 @@ def initialize() -> None:
                 status TEXT NOT NULL DEFAULT 'uploaded',
                 uploaded_by TEXT NOT NULL,
                 extracted_json TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                version INTEGER NOT NULL DEFAULT 1,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                update_comment TEXT
             );
 
             CREATE TABLE IF NOT EXISTS pricing_approval_requests (
@@ -159,3 +182,4 @@ def initialize() -> None:
 
             """
         )
+        _migrate_agreements(db)

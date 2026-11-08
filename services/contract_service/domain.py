@@ -14,16 +14,23 @@ from apollo_wheels_mvp.extraction import detect_agreement_type, extract_agreemen
 from apollo_wheels_mvp.storage import DOCUMENT_DIR, connect
 
 
-def list_agreements(client_id: str | None = None) -> list[dict[str, object]]:
+def list_agreements(client_id: str | None = None, agreement_type: str | None = None, active_only: bool = True) -> list[dict[str, object]]:
     with connect() as db:
         query = "SELECT * FROM agreements"
-        params: tuple[object, ...] = ()
+        params: list[object] = []
+        conditions = []
         if client_id:
-            query += " WHERE client_id=?"
-            params = (client_id,)
-        # The approved seeded MSA/MLA are the default documents for each demo
-        # client. Later uploads remain available as additional versions.
-        query += " ORDER BY CASE WHEN uploaded_by='seed' THEN 0 ELSE 1 END, agreement_type, created_at DESC"
+            conditions.append("client_id=?")
+            params.append(client_id)
+        if agreement_type:
+            conditions.append("agreement_type=?")
+            params.append(agreement_type.upper())
+        if active_only:
+            conditions.append("is_active=1")
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        # Latest active version first for each client+type; seeded docs first
+        query += " ORDER BY CASE WHEN uploaded_by='seed' THEN 0 ELSE 1 END, version DESC, created_at DESC"
         rows = db.execute(query, params).fetchall()
         return [agreement_dict(row) for row in rows]
 
@@ -71,10 +78,10 @@ async def store_upload(client_id: str, agreement_type: str | None, upload: Uploa
         with connect() as db:
             db.execute(
                 """INSERT INTO agreements
-                (id,client_id,agreement_type,version_label,filename,file_path,effective_date,status,uploaded_by,extracted_json)
-                VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (id,client_id,agreement_type,version_label,filename,file_path,effective_date,status,uploaded_by,extracted_json,version,is_active)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (agreement_id, client_id, agreement_type, version, upload.filename, str(path), effective,
-                 "review", uploaded_by, json.dumps(extracted)),
+                 "review", uploaded_by, json.dumps(extracted), 1, 1),
             )
             row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
         return agreement_dict(row)
@@ -88,6 +95,75 @@ def update_extracted_terms(agreement_id: str, extracted: dict[str, object]) -> d
         db.execute("UPDATE agreements SET extracted_json=?, status='review' WHERE id=?", (json.dumps(extracted), agreement_id))
         row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
         if row is None:
+            raise ValueError("Agreement not found.")
+        return agreement_dict(row)
+
+
+def save_agreement_version(
+    agreement_id: str,
+    extracted: dict[str, object],
+    update_comment: str,
+    actor: str
+) -> dict[str, object]:
+    """Create a new version of the agreement with updated terms.
+
+    The current version is archived (is_active=0, status='archived') and a
+    new row is inserted with an incremented version number. list_agreements
+    filters on is_active=1 and orders by version DESC, so the latest version
+    is what callers see by default.
+    """
+    with connect() as db:
+        old_row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
+        if not old_row:
+            raise ValueError("Agreement not found.")
+
+        old_version = old_row["version"]
+        new_version = old_version + 1
+
+        # Archive the previous version so its terms remain queryable as history.
+        db.execute(
+            "UPDATE agreements SET is_active=0, status='archived', update_comment=? WHERE id=?",
+            (update_comment, agreement_id)
+        )
+
+        # Insert the new version. It reuses the same stored PDF (file_path) and
+        # the same client/agreement_type, so the source document stays linked.
+        new_id = str(uuid.uuid4())
+        db.execute(
+            """INSERT INTO agreements
+               (id, client_id, agreement_type, version_label, filename, file_path,
+                effective_date, status, uploaded_by, extracted_json, version, is_active, update_comment)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (new_id, old_row["client_id"], old_row["agreement_type"], str(new_version),
+             old_row["filename"], old_row["file_path"], old_row["effective_date"],
+             "review", actor, json.dumps(extracted), new_version, 1, update_comment)
+        )
+        row = db.execute("SELECT * FROM agreements WHERE id=?", (new_id,)).fetchone()
+        return agreement_dict(row)
+
+
+def update_agreement_identifiers(
+    agreement_id: str,
+    client_id: str,
+    agreement_type: str,
+    actor: str
+) -> dict[str, object]:
+    """Update client_id and agreement_type for a draft/uploaded agreement.
+    Used when user corrects client name / agreement type after upload."""
+    if agreement_type.upper() not in {"MSA", "MLA"}:
+        raise ValueError("Agreement type must be MSA or MLA.")
+    with connect() as db:
+        # Verify client exists
+        client = db.execute("SELECT id FROM clients WHERE id=?", (client_id,)).fetchone()
+        if not client:
+            raise ValueError("Client not found.")
+
+        db.execute(
+            "UPDATE agreements SET client_id=?, agreement_type=?, uploaded_by=?, status='review', is_active=1 WHERE id=?",
+            (client_id, agreement_type.upper(), actor, agreement_id)
+        )
+        row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
+        if not row:
             raise ValueError("Agreement not found.")
         return agreement_dict(row)
 
