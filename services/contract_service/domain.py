@@ -130,31 +130,38 @@ def save_agreement_version(
             (update_comment, agreement_id)
         )
 
-        # Regenerate the PDF from the updated extracted terms.
-        # This provides a visual audit trail of the structured edits.
-        agreement_type = old_row["agreement_type"].upper()
-        client_id = old_row["client_id"]
-        client_name = old_row.get("client_name") or old_row["client_id"]
+        # sqlite3.Row has no .get(); read it as a plain dict so callers can
+        # safely look up optional columns (e.g. client_name, which is not a
+        # column on agreements and falls back to the client id).
+        old_values = dict(old_row)
+        agreement_type = old_values["agreement_type"].upper()
+        client_id = old_values["client_id"]
+        client_name = old_values.get("client_name")
+        if not client_name:
+            client_row = db.execute(
+                "SELECT name FROM clients WHERE id=?", (client_id,)
+            ).fetchone()
+            client_name = client_row["name"] if client_row else client_id
         version_label = str(new_version)
 
         new_filename = f"{agreement_type.lower()}_v{new_version}_{uuid.uuid4().hex[:8]}.pdf"
         new_path = DOCUMENT_DIR / new_filename
 
         if agreement_type == "MSA":
-            write_msa_from_extracted(new_path, client_id, client_name, extracted, version_label)
+            generated_path = write_msa_from_extracted(new_path, client_id, client_name, extracted, version_label)
         elif agreement_type == "MLA":
-            write_mla_from_extracted(new_path, client_id, client_name, extracted, version_label)
+            generated_path = write_mla_from_extracted(new_path, client_id, client_name, extracted, version_label)
         else:
             raise ValueError(f"Unknown agreement type: {agreement_type}")
 
-        # Insert the new version with the new PDF path.
+        # Insert the new version with the generated PDF path (the generator may rename).
         new_id = str(uuid.uuid4())
         db.execute(
             """INSERT INTO agreements
                (id, client_id, agreement_type, version_label, filename, file_path,
                 effective_date, status, uploaded_by, extracted_json, version, is_active, update_comment)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (new_id, client_id, agreement_type, version_label, new_filename, str(new_path),
+            (new_id, client_id, agreement_type, version_label, generated_path.name, str(generated_path),
              old_row["effective_date"], "review", actor, json.dumps(extracted), new_version, 1, update_comment)
         )
         row = db.execute("SELECT * FROM agreements WHERE id=?", (new_id,)).fetchone()

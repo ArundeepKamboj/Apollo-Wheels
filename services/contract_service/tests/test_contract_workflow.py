@@ -131,6 +131,45 @@ class ContractWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Agreement not found"):
             domain.update_extracted_terms("missing", {})
 
+    def test_save_version_archives_old_and_creates_new_version_with_regenerated_pdf(self):
+        agreements = domain.list_agreements("C-1001")
+        agreement = agreements[0]  # This is an MSA
+        original_path = Path(agreement["file_path"])
+        self.assertTrue(original_path.is_file())
+
+        new_terms = dict(agreement["extracted"])
+        new_terms["services"] = [dict(new_terms["services"][0], contract_amount=9.99)]
+
+        saved = domain.save_agreement_version(
+            agreement["id"], new_terms, "regen-test", "structuring:lee",
+        )
+
+        # New version is active, old version is archived, version incremented.
+        self.assertEqual(saved["version"], agreement["version"] + 1)
+        self.assertEqual(saved["status"], "review")
+        self.assertEqual(saved["uploaded_by"], "structuring:lee")
+        self.assertEqual(saved["update_comment"], "regen-test")
+        self.assertEqual(saved["extracted"]["services"][0]["contract_amount"], 9.99)
+        self.assertTrue(Path(saved["file_path"]).is_file())
+
+        all_versions = domain.list_agreements("C-1001", active_only=False)
+        msa_versions = [row for row in all_versions if row["id"] == agreement["id"] or row["id"] == saved["id"]]
+        self.assertEqual(len(msa_versions), 2)
+
+        # The saved version should be active
+        active = [row for row in msa_versions if row["is_active"] == 1]
+        self.assertEqual(len(active), 1)
+        self.assertEqual(active[0]["id"], saved["id"])
+
+        # The old version should be archived (inactive)
+        archived = [row for row in msa_versions if row["is_active"] == 0]
+        self.assertEqual(len(archived), 1)
+        self.assertEqual(archived[0]["status"], "archived")
+
+    def test_save_version_unknown_agreement_returns_value_error(self):
+        with self.assertRaisesRegex(ValueError, "Agreement not found"):
+            domain.save_agreement_version("missing", {}, "comment", "structuring:lee")
+
     def test_invoice_history_setting_is_finance_owned_and_client_scoped(self):
         result = api.set_invoice_history("C-1001", api.InvoiceHistorySetting(enabled=True), Identity("finance.alex", "finance", "user"))
         self.assertTrue(result["include_history_on_invoice"])
