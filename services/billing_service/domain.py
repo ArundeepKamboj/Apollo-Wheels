@@ -1,4 +1,4 @@
-"""Billing PDF ingestion, normalized line storage, reconciliation, and history."""
+"""Billing PDF ingestion, normalized line storage, reconciliation, history, and forecasting."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import re
 import json
 import uuid
 import os
+from datetime import date
 from pathlib import Path
 from urllib.error import URLError
 from services.service_client import open_service_url
@@ -116,6 +117,75 @@ def billing_history(client_id: str, start: str | None = None, end: str | None = 
     query += " ORDER BY bd.period_start DESC, bl.billing_stream, bl.service_name"
     with connect() as db:
         return [dict(row) for row in db.execute(query, params).fetchall()]
+
+
+def forecast_billing(client_id: str, start: str, end: str, billing_stream: str) -> dict[str, object]:
+    """
+    Forecast estimated charges for a client and period based on active pricing setup.
+
+    This is a projection from the Pricing API's active components, not actual billed data.
+    For each active pricing component matching the stream, computes amount × quantity.
+    """
+    pricing_api = os.getenv("PRICING_API_URL", "http://127.0.0.1:8002")
+    try:
+        with open_service_url(f"{pricing_api}/api/clients/{client_id}/pricing", "billing-service", "AUTH_BILLING_SERVICE_SECRET") as response:
+            pricing_data = json.loads(response.read().decode("utf-8"))
+    except (URLError, TimeoutError, OSError) as exc:
+        raise ValueError("Billing forecast needs the Pricing API to be running locally.") from exc
+
+    # Only use the latest active pricing request (by created_at), not historical ones.
+    requests = pricing_data.get("requests", [])
+    latest_active_request_id = None
+    latest_created_at = None
+    for req in requests:
+        if req.get("status") == "active":
+            created = req.get("created_at", "")
+            if latest_created_at is None or created > latest_created_at:
+                latest_created_at = created
+                latest_active_request_id = req.get("id")
+    active_components = [
+        row for row in pricing_data.get("components", [])
+        if row.get("status") == "active"
+        and (latest_active_request_id is None or row.get("approval_request_id") == latest_active_request_id)
+    ]
+
+    # Filter by stream: SERVICE, LEASE, or COMBINED (both)
+    if billing_stream.upper() != "COMBINED":
+        active_components = [
+            c for c in active_components
+            if c.get("billing_stream", "").upper() == billing_stream.upper()
+        ]
+
+    lines = []
+    total = 0.0
+    for comp in active_components:
+        amount = float(comp.get("amount", 0))
+        quantity = float(comp.get("quantity", 1))
+        line_total = amount * quantity
+        total += line_total
+        lines.append({
+            "service_code": comp.get("service_code"),
+            "service_name": comp.get("service_name"),
+            "component_code": comp.get("component_code"),
+            "component_name": comp.get("component_name"),
+            "billing_stream": comp.get("billing_stream"),
+            "charge_type": comp.get("charge_type"),
+            "quantity": quantity,
+            "rate": amount,
+            "rate_unit": comp.get("rate_unit"),
+            "amount": line_total,
+            "currency": comp.get("currency", "USD"),
+        })
+
+    return {
+        "client_id": client_id,
+        "period_start": start,
+        "period_end": end,
+        "billing_stream": billing_stream.upper(),
+        "lines": lines,
+        "total": round(total, 2),
+        "line_count": len(lines),
+    }
 
 
 def _component_key(service_code: object, component: object, stream: object) -> tuple[str, str, str]:

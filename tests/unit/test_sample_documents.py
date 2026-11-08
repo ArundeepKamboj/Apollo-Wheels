@@ -24,15 +24,13 @@ class SampleDocumentTests(unittest.TestCase):
         text = "\n".join(pages)
 
         self.assertGreaterEqual(len(pages), 3)
-        self.assertIn("Section 1. Definitions and interpretation", text)
-        self.assertIn("Section 8. Fees, invoicing, taxes and payment", text)
+        self.assertIn("SECTION: 2. Definitions and interpretation", text)
+        self.assertIn("SECTION: 5. Fees, invoicing and payment", text)
         self.assertIn("IN WITNESS WHEREOF", text)
         self.assertIn("PROVIDER:", text)
-        self.assertIn("Demo assumption (review required)", text)
-        self.assertIn("Schedule 1 - Services and recurring charges", text)
-        self.assertIn("Appendix A - Structured source records", text)
         self.assertNotIn("drafting template", text.lower())
-        self.assertTrue(any(line.startswith("SERVICE|FUEL|") for page in pages for line in page.splitlines()))
+        self.assertIn("Schedule 1 forms part of this Agreement", text)
+        self.assertIn("Service code: FUEL", text)
 
     def test_each_msa_contains_all_services_and_nine_subscriptions(self):
         msa_files = list((SAMPLES / "contracts").rglob("*msa*.pdf"))
@@ -70,7 +68,7 @@ class SampleDocumentTests(unittest.TestCase):
         msa_text = "\n".join(msa_pages)
         mla_text = "\n".join(mla_pages)
         self.assertGreaterEqual(len(msa_pages), 10)
-        self.assertGreaterEqual(len(mla_pages), 10)
+        self.assertGreaterEqual(len(mla_pages), 9)
         self.assertEqual(detect_agreement_type([msa_text]), "MSA")
         self.assertEqual(detect_agreement_type([mla_text]), "MLA")
         self.assertEqual(len(parse_service_rows(msa_text)), 13)

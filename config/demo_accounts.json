@@ -7,6 +7,6 @@
   ],
   "services": [
     {"client_id": "pricing-service", "secret_env": "AUTH_PRICING_SERVICE_SECRET", "salt": "cd58d0648ce349609bf088c9eb2f8e20", "secret_hash": "YEO-J_Dh8kVoDUO9YrwDNCCJhSE4ar-SFlyW-WZ1Qfg", "scopes": ["contract:read"]},
-    {"client_id": "billing-service", "secret_env": "AUTH_BILLING_SERVICE_SECRET", "salt": "8d00d6fbc829efcebb01597557ab43ed", "secret_hash": "wV9Mdy3pV9ZPLJ6gFZOfYnZT9Ho4-7lQ1_Tnbroberc", "scopes": ["contract:read", "pricing:read"]}
+    {"client_id": "billing-service", "secret_env": "AUTH_BILLING_SERVICE_SECRET", "salt": "8d00d6fbc829efcebb01597557ab43ed", "secret_hash": "wV9Mdy3pV9ZPLJ6gFZOfYnZT9Ho4-7lQ1_Tnbroberc", "scopes": ["contract:read", "pricing:read", "billing:read"]}
   ]
 }

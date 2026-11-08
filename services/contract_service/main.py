@@ -12,7 +12,7 @@ from apollo_wheels_mvp.storage import initialize
 @asynccontextmanager
 async def lifespan(_):
     initialize()
-    seed_demo_data()
+    seed_demo_data(include_workflow_history=True)
     yield
 
 

@@ -65,68 +65,94 @@ def seed_workflow_history(db, demo_clients, agreements_by_client) -> None:
     """Populate optional two-client pricing and billing fixtures for workflow tests."""
     for client_id, client_name, _folder, _prefix in demo_clients:
         agreement_map = agreements_by_client[client_id]
-        request_id = str(uuid.uuid4())
-        agreement_ids = [agreement_map["MSA"]["id"], agreement_map["MLA"]["id"]]
-        db.execute(
-            """INSERT INTO pricing_approval_requests
-               (id,client_id,agreement_ids_json,version,status,initiated_by,approved_by,approved_at,effective_from)
-               VALUES (?,?,?,1,'active','finance.alex','finance.jordan','2026-01-01T10:00:00','2026-01-01')""",
-            (request_id, client_id, json.dumps(agreement_ids)),
-        )
+
+        # Check if pricing data already exists for this client
+        existing_pricing = db.execute(
+            "SELECT COUNT(*) FROM pricing_approval_requests WHERE client_id=? AND status='active'",
+            (client_id,)
+        ).fetchone()[0]
+
         components: list[dict[str, object]] = []
-        for term in agreement_map["MSA"]["extracted"]["services"]:
-            if not term["subscribed"]:
-                continue
+        if existing_pricing == 0:
+            request_id = str(uuid.uuid4())
+            agreement_ids = [agreement_map["MSA"]["id"], agreement_map["MLA"]["id"]]
+            db.execute(
+                """INSERT INTO pricing_approval_requests
+                   (id,client_id,agreement_ids_json,version,status,initiated_by,approved_by,approved_at,effective_from)
+                   VALUES (?,?,?,1,'active','finance.alex','finance.jordan','2026-01-01T10:00:00','2026-01-01')""",
+                (request_id, client_id, json.dumps(agreement_ids)),
+            )
+            for term in agreement_map["MSA"]["extracted"]["services"]:
+                if not term["subscribed"]:
+                    continue
+                components.append({
+                    "agreement_id": agreement_map["MSA"]["id"], "agreement_type": "MSA", "billing_stream": "SERVICE",
+                    "service_code": term["service_code"], "service_name": term["service_name"],
+                    "component_code": term["component_name"], "component_name": term["component_name"].replace("_", " ").title(),
+                    "charge_type": "recurring", "amount": term["contract_amount"], "currency": "USD",
+                    "rate_unit": term["rate_unit"],
+                    "quantity": term.get("vehicle_count") or term.get("driver_count") or 1,
+                    "billing_frequency": term.get("billing_frequency") or "monthly",
+                    "billing_day": term.get("billing_day"), "effective_from": "2026-01-01",
+                    "terms": {"pricing_basis": term.get("pricing_basis", "USD")},
+                })
             components.append({
                 "agreement_id": agreement_map["MSA"]["id"], "agreement_type": "MSA", "billing_stream": "SERVICE",
-                "service_code": term["service_code"], "service_name": term["service_name"],
-                "component_code": term["component_name"], "component_name": term["component_name"].replace("_", " ").title(),
-                "charge_type": "recurring", "amount": term["contract_amount"], "currency": "USD",
-                "rate_unit": term["rate_unit"],
-                "quantity": term.get("vehicle_count") or term.get("driver_count") or 1,
-                "billing_frequency": term.get("billing_frequency") or "monthly",
-                "billing_day": term.get("billing_day"), "effective_from": "2026-01-01",
-                "terms": {"pricing_basis": term.get("pricing_basis", "USD")},
+                "service_code": "FUEL", "service_name": "Fuel", "component_code": "activation",
+                "component_name": "One-time setup", "charge_type": "one_time", "amount": 250.0,
+                "currency": "USD", "rate_unit": "account", "quantity": 1,
+                "billing_frequency": "one_time", "billing_day": None, "effective_from": "2026-01-01",
+                "terms": {"pricing_basis": "USD"},
             })
-        components.append({
-            "agreement_id": agreement_map["MSA"]["id"], "agreement_type": "MSA", "billing_stream": "SERVICE",
-            "service_code": "FUEL", "service_name": "Fuel", "component_code": "activation",
-            "component_name": "One-time setup", "charge_type": "one_time", "amount": 250.0,
-            "currency": "USD", "rate_unit": "account", "quantity": 1,
-            "billing_frequency": "one_time", "billing_day": None, "effective_from": "2026-01-01",
-            "terms": {"pricing_basis": "USD"},
-        })
-        lease = agreement_map["MLA"]["extracted"]["lease"]
-        for vehicle in lease.get("vehicles") or [lease]:
-            vehicle_type = vehicle.get("vehicle_type") or " ".join(
-                value for value in (vehicle.get("vehicle_make"), vehicle.get("vehicle_model")) if value
-            )
-            components.append({
-                "agreement_id": agreement_map["MLA"]["id"], "agreement_type": "MLA", "billing_stream": "LEASE",
-                "service_code": vehicle["service_code"], "service_name": vehicle["service_name"],
-                "component_code": vehicle["component_name"], "component_name": f"Monthly Lease - {vehicle_type}",
-                "charge_type": "recurring", "amount": vehicle["contract_amount"],
-                "currency": vehicle.get("pricing_basis", "USD"), "rate_unit": vehicle["rate_unit"],
-                "quantity": vehicle["quantity"], "billing_frequency": vehicle["billing_frequency"],
-                "billing_day": vehicle["billing_day"], "effective_from": vehicle["effective_from"],
-                "terms": {"term_months": vehicle["term_months"], "vehicle_type": vehicle_type,
-                          "vehicle_make": vehicle["vehicle_make"], "vehicle_model": vehicle["vehicle_model"],
-                          "engine_type": vehicle["engine_type"], "pricing_basis": vehicle["pricing_basis"]},
-            })
-        for component in components:
-            db.execute(
-                """INSERT INTO pricing_components
-                   (id,approval_request_id,client_id,agreement_id,agreement_type,billing_stream,service_code,service_name,
-                    component_code,component_name,charge_type,amount,currency,rate_unit,quantity,billing_frequency,
-                    billing_day,terms_json,effective_from,status)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active')""",
-                (str(uuid.uuid4()), request_id, client_id, component["agreement_id"], component["agreement_type"],
-                 component["billing_stream"], component["service_code"], component["service_name"],
-                 component["component_code"], component["component_name"], component["charge_type"],
-                 component["amount"], component["currency"], component["rate_unit"], component["quantity"],
-                 component["billing_frequency"], component["billing_day"], json.dumps(component["terms"]),
-                 component["effective_from"]),
-            )
+            lease = agreement_map["MLA"]["extracted"]["lease"]
+            for vehicle in lease.get("vehicles") or [lease]:
+                vehicle_type = vehicle.get("vehicle_type") or " ".join(
+                    value for value in (vehicle.get("vehicle_make"), vehicle.get("vehicle_model")) if value
+                )
+                components.append({
+                    "agreement_id": agreement_map["MLA"]["id"], "agreement_type": "MLA", "billing_stream": "LEASE",
+                    "service_code": vehicle["service_code"], "service_name": vehicle["service_name"],
+                    "component_code": vehicle["component_name"], "component_name": f"Monthly Lease - {vehicle_type}",
+                    "charge_type": "recurring", "amount": vehicle["contract_amount"],
+                    "currency": vehicle.get("pricing_basis", "USD"), "rate_unit": vehicle["rate_unit"],
+                    "quantity": vehicle["quantity"], "billing_frequency": vehicle["billing_frequency"],
+                    "billing_day": vehicle["billing_day"], "effective_from": vehicle["effective_from"],
+                    "terms": {"term_months": vehicle["term_months"], "vehicle_type": vehicle_type,
+                              "vehicle_make": vehicle["vehicle_make"], "vehicle_model": vehicle["vehicle_model"],
+                              "engine_type": vehicle["engine_type"], "pricing_basis": vehicle["pricing_basis"]},
+                })
+            for component in components:
+                db.execute(
+                    """INSERT INTO pricing_components
+                       (id,approval_request_id,client_id,agreement_id,agreement_type,billing_stream,service_code,service_name,
+                        component_code,component_name,charge_type,amount,currency,rate_unit,quantity,billing_frequency,
+                        billing_day,terms_json,effective_from,status)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active')""",
+                    (str(uuid.uuid4()), request_id, client_id, component["agreement_id"], component["agreement_type"],
+                     component["billing_stream"], component["service_code"], component["service_name"],
+                     component["component_code"], component["component_name"], component["charge_type"],
+                     component["amount"], component["currency"], component["rate_unit"], component["quantity"],
+                     component["billing_frequency"], component["billing_day"], json.dumps(component["terms"]),
+                     component["effective_from"]),
+                )
+        else:
+            # Pricing already exists; load components from DB for billing line matching
+            rows = db.execute(
+                """SELECT agreement_id, agreement_type, billing_stream, service_code, service_name,
+                          component_code, component_name, charge_type, amount, currency, rate_unit, quantity,
+                          billing_frequency, billing_day, terms_json, effective_from
+                   FROM pricing_components WHERE client_id=? AND status='active'""",
+                (client_id,)
+            ).fetchall()
+            for row in rows:
+                components.append({
+                    "agreement_id": row[0], "agreement_type": row[1], "billing_stream": row[2],
+                    "service_code": row[3], "service_name": row[4],
+                    "component_code": row[5], "component_name": row[6], "charge_type": row[7],
+                    "amount": row[8], "currency": row[9], "rate_unit": row[10], "quantity": row[11],
+                    "billing_frequency": row[12], "billing_day": row[13],
+                    "terms": json.loads(row[14]), "effective_from": row[15],
+                })
 
         for month, start, end in (
             ("JAN", "2026-01-01", "2026-01-31"),
@@ -134,6 +160,14 @@ def seed_workflow_history(db, demo_clients, agreements_by_client) -> None:
             ("MAR", "2026-03-01", "2026-03-31"),
         ):
             for stream in ("SERVICE", "LEASE"):
+                # Check if billing documents already exist for this client/period/stream
+                existing = db.execute(
+                    "SELECT COUNT(*) FROM billing_documents WHERE client_id=? AND period_start=? AND billing_stream=?",
+                    (client_id, start, stream)
+                ).fetchone()[0]
+                if existing > 0:
+                    continue  # Skip seeding for this period/stream
+
                 invoice = write_demo_invoice(
                     DOCUMENT_DIR, client_id, client_name, start, end,
                     f"INV-{client_id}-{month}-{stream}", stream,

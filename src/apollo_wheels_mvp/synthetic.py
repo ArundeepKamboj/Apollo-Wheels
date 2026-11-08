@@ -127,6 +127,10 @@ def make_text_pdf(lines: list[str], body_size: float | None = None, body_leading
         flow.append(_styled_table(data, [0.7, 1.4, 1.2, 1.1, .9, .85], styles))
     if invoice_rows:
         flow.append(Paragraph("Invoice detail", styles["SectionTitle"]))
+        # Add LINE rows as plain text for parse_billing_rows to extract
+        for row in invoice_rows:
+            flow.append(Paragraph(_pdf_safe(row), styles["BodyCopy"]))
+        # Also add as table for human-readable view
         data = [["Stream", "Code", "Description", "Charge", "Qty", "Rate", "Amount"]]
         for row in invoice_rows:
             _, stream, code, name, component, charge_type, quantity, rate, unit, amount = row.split("|")
@@ -392,6 +396,7 @@ def write_clean_msa(path: Path, client_id: str, client_name: str, prefix: str) -
         "Schedule 1 forms part of this Agreement. Each service section below states the service scope, selection status, billing basis, recurring charge and initial quantity basis.",
         *service_sections,
         "Schedule 2 - One-time charges", "The one-time onboarding and configuration charge is USD 250.00, payable in the first billing period.",
+        "COMPONENT|FUEL|activation|One-time setup|one_time|250.00|account|1",
         "END_OF_AGREEMENT",
     ]
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -490,6 +495,60 @@ def write_demo_invoice(
     path.write_bytes(make_text_pdf(lines))
     return {"invoice_number": number, "filename": filename, "path": path, "lines": lines, "stream": stream,
             "period_start": period_start, "period_end": period_end}
+
+
+def write_forecast_invoice(
+    folder: Path,
+    client_id: str,
+    client_name: str,
+    period_start: str,
+    period_end: str,
+    numbering: str,
+    billing_stream: str,
+    lines: list[dict[str, object]],
+    total: float,
+) -> dict[str, object]:
+    """Generate an invoice-style PDF from forecasted billing lines.
+
+    Args:
+        folder: Output directory for the PDF
+        client_id: Client identifier
+        client_name: Human-readable client name
+        period_start: Period start date (ISO format)
+        period_end: Period end date (ISO format)
+        numbering: Invoice number (e.g., "FORECAST-C-1001-JAN")
+        billing_stream: "SERVICE", "LEASE", or "COMBINED"
+        lines: Forecasted line items (each has service_name, component_name, quantity, rate, amount, rate_unit, currency, billing_stream)
+        total: Total amount for the period
+
+    Returns dict with filename, path, and line count.
+    """
+    folder.mkdir(parents=True, exist_ok=True)
+    lines_metadata = [
+        f"INVOICE_NUMBER: {numbering}",
+        f"BILLING_STREAM: {billing_stream}",
+        f"PERIOD_START: {period_start}",
+        f"PERIOD_END: {period_end}",
+        "All values are forecast estimates based on active pricing.",
+    ]
+
+    # Build invoice line rows
+    # Format: LINE|STREAM|CODE|NAME|COMPONENT|CHARGE_TYPE|QTY|RATE|UNIT|AMOUNT
+    invoice_rows = []
+    for line in lines:
+        qty = line.get("quantity", 0)
+        rate = line.get("rate", 0)
+        amount = line.get("amount", 0)
+        unit = line.get("rate_unit", "").replace("_", " ")
+        invoice_rows.append(
+            f"LINE|{line['billing_stream']}|{line['service_code']}|{line['service_name']}|"
+            f"{line['component_code']}|{line['charge_type']}|{qty}|{rate:.2f}|{unit}|{amount:.2f}"
+        )
+
+    all_lines = ["APOLLO WHEELS — FORECAST BILLING STATEMENT"] + lines_metadata + invoice_rows + ["END_OF_INVOICE"]
+    pdf_path = folder / f"{numbering.lower()}.pdf"
+    pdf_path.write_bytes(make_text_pdf(all_lines))
+    return {"invoice_number": numbering, "filename": pdf_path.name, "path": pdf_path, "line_count": len(lines), "total": total}
 
 
 def write_mla_from_extracted(path: Path, client_id: str, client_name: str, extracted: dict[str, object], version: str) -> Path:

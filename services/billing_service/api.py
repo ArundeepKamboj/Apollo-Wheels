@@ -1,11 +1,16 @@
 """HTTP routes owned by the Billing and Audit service."""
 
+import json
+import os
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pathlib import Path
+from io import BytesIO
 
-from apollo_wheels_mvp.storage import connect
+from apollo_wheels_mvp.storage import connect, DOCUMENT_DIR
+from apollo_wheels_mvp.synthetic import write_forecast_invoice
 from services.auth import Identity, api_access, get_identity, require_user
+from services.service_client import open_service_url
 from . import domain
 
 router = APIRouter(dependencies=[Depends(api_access("billing"))])
@@ -32,6 +37,12 @@ def client_billing_history(client_id: str, start: str | None = None, end: str | 
     return domain.billing_history(client_id, start, end)
 
 
+@router.get("/api/clients/{client_id}/billing-forecast")
+def client_billing_forecast(client_id: str, start: str, end: str, stream: str = "COMBINED"):
+    """Forecast estimated charges for a client and period based on active pricing setup."""
+    return domain.forecast_billing(client_id, start, end, stream)
+
+
 @router.get("/api/clients/{client_id}/audit")
 def client_audit(client_id: str, start: str | None = None, end: str | None = None):
     return domain.audit_client(client_id, start, end)
@@ -47,6 +58,50 @@ def client_combined_billing(client_id: str, start: str | None = None, end: str |
                             actor: Identity = Depends(get_identity)):
     """Finance view of all billing for a client, grouped by period across streams."""
     return domain.combined_billing(client_id, start, end)
+
+
+@router.post("/api/clients/{client_id}/billing-forecast-pdf")
+def generate_forecast_pdf(
+    client_id: str,
+    stream: str = "COMBINED",
+    actor: Identity = Depends(get_identity),
+    start: str | None = None,
+    end: str | None = None,
+):
+    """
+    Generate a forecast PDF for the selected client, period, and billing stream.
+    Start and end are passed as query parameters.
+    Returns the PDF info including download path.
+    """
+    if not start or not end:
+        raise ValueError("Both start and end dates are required.")
+    forecast = domain.forecast_billing(client_id, start, end, stream)
+    # Get client name from the Contract API for display
+    contract_api = os.getenv("CONTRACT_API_URL", "http://127.0.0.1:8001")
+    client_name = f"Client {client_id}"
+    try:
+        with open_service_url(f"{contract_api}/api/clients/{client_id}", "billing-service", "AUTH_BILLING_SERVICE_SECRET") as resp:
+            client_data = json.loads(resp.read().decode())
+            client_name = client_data.get("name", client_name)
+    except Exception:
+        pass
+
+    invoice_number = f"FORECAST-{client_id}-{start}-{stream}"
+    result = write_forecast_invoice(
+        DOCUMENT_DIR, client_id, client_name, start, end, invoice_number, stream,
+        forecast["lines"], forecast["total"],
+    )
+    # Return the file info for download
+    return {
+        "filename": result["filename"],
+        "invoice_number": result["invoice_number"],
+        "period_start": start,
+        "period_end": end,
+        "billing_stream": stream,
+        "line_count": result["line_count"],
+        "total": result["total"],
+        "download_url": f"/api/billing-pdfs/{result['filename']}",
+    }
 
 
 @router.get("/api/clients/{client_id}/pdfs")
@@ -67,3 +122,14 @@ def stored_pdf(document_id: str):
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Document file missing from local file store.")
     return FileResponse(path, media_type="application/pdf", filename=row["filename"])
+
+
+@router.get("/api/billing-pdfs/{filename}")
+def download_forecast_pdf(filename: str):
+    """Download a forecast PDF file by filename."""
+    # Sanitize filename to prevent path traversal
+    safe_name = Path(filename).name
+    path = DOCUMENT_DIR / safe_name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Forecast file not found.")
+    return FileResponse(path, media_type="application/pdf", filename=safe_name)

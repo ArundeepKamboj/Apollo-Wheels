@@ -112,6 +112,9 @@ def api_access(service_name: str):
         allowed = {
             ("contract", "GET", "/api/clients/", "contract:read"),
             ("pricing", "GET", "/api/clients/", "pricing:read"),
+            ("billing", "GET", "/api/clients/", "billing:read"),
+            ("billing", "POST", "/api/clients/", "billing:read"),
+            ("billing", "GET", "/api/billing-pdfs/", "billing:read"),
         }
         for owner, verb, prefix, scope in allowed:
             if service_name == owner and method == verb and path.startswith(prefix):
