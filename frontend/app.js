@@ -906,12 +906,15 @@ async function saveTerms() {
 
     const comment = prompt("Enter update comment for audit trail:");
     if (!comment) return;
-    await api(`/api/agreements/${agreement.id}/save-version`, {
+    // Save creates a NEW version with a new ID; capture it to refresh the view
+    const saved = await api(`/api/agreements/${agreement.id}/save-version`, {
       method: "PUT",
       body: JSON.stringify({ extracted, update_comment: comment }),
     });
+    // Update state to the new version so the PDF loads the regenerated version
+    state.selectedAgreement = saved.id;
     notify("New version saved with audit comment");
-    renderContracts();
+    await renderContracts();
   } catch (error) {
     notify(error.message);
   }
