@@ -541,8 +541,7 @@ def write_msa_from_extracted(path: Path, client_id: str, client_name: str, extra
         raise ValueError("No service or component data to generate MSA")
 
     prefix = "REGEN"
-    msa_filename = f"{prefix}_{client_id}_{version}.pdf"
-    msa_path = path.parent / msa_filename
+    msa_path = path
     service_lines.append("COMPONENT|FUEL|activation|One-time setup|one_time|250.00|account|1")
 
     all_lines = [

@@ -44,12 +44,19 @@ def _forward(target: str, request: Request, body: bytes, request_id: str):
     outbound = UrlRequest(url, data=body or None, headers=headers, method=request.method)
     try:
         with urlopen(outbound, timeout=30) as upstream:
+            # Include CORS headers in the response so browsers can access cross-origin requests
+            cors_headers = {key: value for key, value in upstream.headers.items()
+                           if key.lower().startswith("access-control-")}
             return Response(upstream.read(), status_code=upstream.status,
                             headers={key: value for key, value in upstream.headers.items()
-                                     if key.lower() in {"content-type", "content-disposition", "cache-control"}})
+                                     if key.lower() in {"content-type", "content-disposition", "cache-control"}}
+                            | cors_headers)
     except HTTPError as error:
+        cors_headers = {key: value for key, value in error.headers.items()
+                       if key.lower().startswith("access-control-")}
         return Response(error.read(), status_code=error.code,
-                        headers={"Content-Type": error.headers.get("Content-Type", "application/json")})
+                        headers={"Content-Type": error.headers.get("Content-Type", "application/json")}
+                        | cors_headers)
     except (URLError, TimeoutError, OSError) as error:
         raise HTTPException(status_code=502, detail="The requested service is unavailable.") from error
 

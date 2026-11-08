@@ -114,25 +114,15 @@ def save_agreement_version(
     is what callers see by default.
 
     A new PDF is regenerated from the extracted terms, providing a visual
-    audit trail of the changes made.
+    audit trail of the changes made. The extracted terms are re-validated
+    against the new PDF to ensure source_text and evidence_page references
+    match the regenerated document.
     """
     with connect() as db:
         old_row = db.execute("SELECT * FROM agreements WHERE id=?", (agreement_id,)).fetchone()
         if not old_row:
             raise ValueError("Agreement not found.")
 
-        old_version = old_row["version"]
-        new_version = old_version + 1
-
-        # Archive the previous version so its terms remain queryable as history.
-        db.execute(
-            "UPDATE agreements SET is_active=0, status='archived', update_comment=? WHERE id=?",
-            (update_comment, agreement_id)
-        )
-
-        # sqlite3.Row has no .get(); read it as a plain dict so callers can
-        # safely look up optional columns (e.g. client_name, which is not a
-        # column on agreements and falls back to the client id).
         old_values = dict(old_row)
         agreement_type = old_values["agreement_type"].upper()
         client_id = old_values["client_id"]
@@ -142,6 +132,9 @@ def save_agreement_version(
                 "SELECT name FROM clients WHERE id=?", (client_id,)
             ).fetchone()
             client_name = client_row["name"] if client_row else client_id
+
+        old_version = old_values["version"]
+        new_version = old_version + 1
         version_label = str(new_version)
 
         new_filename = f"{agreement_type.lower()}_v{new_version}_{uuid.uuid4().hex[:8]}.pdf"
@@ -154,7 +147,44 @@ def save_agreement_version(
         else:
             raise ValueError(f"Unknown agreement type: {agreement_type}")
 
-        # Insert the new version with the generated PDF path (the generator may rename).
+        # Re-extract terms from the newly generated PDF to update source_text
+        # and evidence_page so they match the regenerated document.
+        new_pages = extract_pdf_pages(generated_path)
+        validated_extracted = extract_agreement_terms(new_pages, agreement_type)
+
+        # Preserve user-edited field values (contract_amount, subscribed, etc.)
+        # while using updated evidence from the new PDF.
+        if agreement_type == "MSA":
+            for svc in validated_extracted.get("services", []):
+                # Find matching service by code and copy updated values
+                old_svc = next((s for s in extracted.get("services", [])
+                               if s.get("service_code") == svc.get("service_code")), None)
+                if old_svc:
+                    svc["contract_amount"] = old_svc.get("contract_amount")
+                    svc["subscribed"] = old_svc.get("subscribed", svc.get("subscribed", False))
+                    svc["vehicle_count"] = old_svc.get("vehicle_count", svc.get("vehicle_count", 0))
+                    svc["driver_count"] = old_svc.get("driver_count", svc.get("driver_count", 0))
+            for comp in validated_extracted.get("components", []):
+                old_comp = next((c for c in extracted.get("components", [])
+                                if c.get("component_name") == comp.get("component_name")), None)
+                if old_comp:
+                    comp["contract_amount"] = old_comp.get("contract_amount")
+        elif agreement_type == "MLA":
+            lease = extracted.get("lease", {}) or {}
+            if lease and "lease" in validated_extracted:
+                for key in ["contract_amount", "quantity", "term_months", "effective_from",
+                           "billing_frequency", "billing_day", "vehicle_make", "vehicle_model",
+                           "engine_type", "pricing_basis", "rate_unit"]:
+                    if key in lease:
+                        validated_extracted["lease"][key] = lease[key]
+
+        # Archive the previous version so its terms remain queryable as history.
+        db.execute(
+            "UPDATE agreements SET is_active=0, status='archived', update_comment=? WHERE id=?",
+            (update_comment, agreement_id)
+        )
+
+        # Insert the new version with the generated PDF path and validated extracted terms.
         new_id = str(uuid.uuid4())
         db.execute(
             """INSERT INTO agreements
@@ -162,7 +192,7 @@ def save_agreement_version(
                 effective_date, status, uploaded_by, extracted_json, version, is_active, update_comment)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (new_id, client_id, agreement_type, version_label, generated_path.name, str(generated_path),
-             old_row["effective_date"], "review", actor, json.dumps(extracted), new_version, 1, update_comment)
+             old_values["effective_date"], "review", actor, json.dumps(validated_extracted), new_version, 1, update_comment)
         )
         row = db.execute("SELECT * FROM agreements WHERE id=?", (new_id,)).fetchone()
         return agreement_dict(row)
