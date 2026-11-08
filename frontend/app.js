@@ -29,6 +29,8 @@ const state = {
   billingEnd: "",
   billingMin: "",
   billingMax: "",
+  // Forecast billing preview modal state
+  forecastPreview: null, // { clientId, clientName, agreementType, start, end, stream, data }
 };
 const $ = (s) => document.querySelector(s);
 const money = (n) =>
@@ -577,6 +579,14 @@ async function renderContracts() {
           <label class="checkline"><input type="checkbox" id="toggle-evidence" ${state.showEvidence ? "checked" : ""}> Show evidence</label>
           <label class="checkline"><input type="checkbox" id="toggle-confidence" ${state.showConfidence ? "checked" : ""}> Show confidence %</label>
         </div>
+        ${selected && (state.role === "finance" || state.role === "structuring") ? `
+          <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
+            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Preview period start</span><input type="date" id="forecast-start" class="input" value=""></label>
+            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Preview period end</span><input type="date" id="forecast-end" class="input" value=""></label>
+            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Stream</span><select id="forecast-stream" class="input"><option value="COMBINED">COMBINED</option><option value="SERVICE">SERVICE</option><option value="LEASE">LEASE</option></select></label>
+            <button class="btn btn-secondary" id="preview-billing" style="align-self:end;">Preview Billing</button>
+          </div>
+        ` : ""}
       </div>
       <div id="terms-editor" class="scroll-panel">${selected ? renderTermsEditor(selected, isDraft) : '<div class="empty contract-empty">Select an existing client or upload a PDF to view extracted terms.</div>'}</div>
       <div class="row spread contract-footer">
@@ -595,6 +605,17 @@ async function renderContracts() {
       </div>
     </section>
   </div>`;
+
+  // Set default dates for forecast preview (current month range)
+  const today = new Date();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const formatDate = (d) => d.toISOString().split("T")[0];
+
+  const startInput = $("#forecast-start");
+  const endInput = $("#forecast-end");
+  if (startInput && !startInput.value) startInput.value = formatDate(monthStart);
+  if (endInput && !endInput.value) endInput.value = formatDate(monthEnd);
 
   // Tab switching
   $("#tab-existing").onclick = async () => {
@@ -688,7 +709,54 @@ async function renderContracts() {
       downloadAgreementPdf(selected).catch((error) => notify(error.message));
     loadAgreementPdf(selected.id).catch((error) => notify(error.message));
   }
+
+  // Preview billing button handler
+  const previewBtn = $("#preview-billing");
+  if (previewBtn) {
+    previewBtn.onclick = async () => {
+      const start = $("#forecast-start").value;
+      const end = $("#forecast-end").value;
+      const stream = $("#forecast-stream").value;
+      if (!start || !end) {
+        notify("Please select both start and end dates");
+        return;
+      }
+      const client = state.clients.find(c => c.id === state.contractExistingClientId || c.id === selected.client_id);
+      const clientId = client?.id || selected.client_id;
+      const clientName = client?.name || selected.detected_client_name || "Unknown Client";
+      const agreementType = selected.agreement_type;
+      try {
+        const forecast = await api(
+          `/api/clients/${clientId}/billing-forecast?${new URLSearchParams({ start, end, stream })}`
+        );
+        state.forecastPreview = {
+          clientId,
+          clientName,
+          agreementType,
+          start,
+          end,
+          stream,
+          data: forecast,
+        };
+        renderContracts();
+      } catch (e) {
+        notify(e.message);
+      }
+    };
+  }
+
+  // Close preview modal when clicking outside
+  if (state.forecastPreview) {
+    // The modal will be rendered by renderTermsEditor or separately
+    // We need to render it as an overlay
+  }
+
   bindEvidenceHighlights();
+
+  // Render forecast preview modal if open
+  if (state.forecastPreview) {
+    renderForecastPreviewModal();
+  }
 }
 function confidenceLabel(item, field) {
   const score = item.field_confidence?.[field];
@@ -708,6 +776,133 @@ function renderEvidence(item, field) {
     ? `<div class="small muted">${esc(confidenceLabel(item, field))}</div>`
     : "";
   return evidenceHtml + confidenceHtml;
+}
+
+function renderForecastPreviewModal() {
+  const preview = state.forecastPreview;
+  if (!preview) return;
+
+  const { clientName, agreementType, start, end, stream, data } = preview;
+  const lines = data.lines || [];
+  const total = data.total || 0;
+
+  // Create modal overlay
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(20, 50, 60, 0.6);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; padding: 20px; animation: fadeIn 0.15s ease-out;
+  `;
+
+  // Create modal content
+  const modal = document.createElement("div");
+  modal.className = "modal-content";
+  modal.style.cssText = `
+    background: white; border-radius: 12px; box-shadow: var(--shadow);
+    max-width: 800px; width: 100%; max-height: 85vh; overflow: auto;
+    animation: slideUp 0.2s ease-out;
+  `;
+
+  const lineRows = lines.map(line => `
+    <tr>
+      <td><span class="tag ${line.billing_stream === 'SERVICE' ? 'good' : 'neutral'}">${esc(line.billing_stream)}</span></td>
+      <td>${esc(line.service_name)}</td>
+      <td>${esc(line.component_name)}</td>
+      <td>${esc(line.charge_type)}</td>
+      <td>${line.quantity} ${esc(line.rate_unit)}</td>
+      <td>${money(line.rate)}</td>
+      <td><b>${money(line.amount)}</b></td>
+    </tr>
+  `).join("");
+
+  modal.innerHTML = `
+    <style>
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);">
+      <div>
+        <h2 style="margin:0;font:700 16px 'Manrope';">Forecast Billing Preview</h2>
+        <div class="small muted" style="margin-top:4px;">
+          ${esc(clientName)} · ${esc(agreementType)} · ${esc(stream)} · ${esc(start)} to ${esc(end)}
+        </div>
+      </div>
+      <button id="close-preview-modal" class="icon-btn" style="font-size:20px;color:var(--muted);background:none;border:none;cursor:pointer;padding:4px;">&times;</button>
+    </div>
+    <div style="padding:20px;">
+      <div class="table-wrap" style="max-height:50vh;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead>
+            <tr style="background:#f7faf9;color:#667b81;position:sticky;top:0;z-index:1;">
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Stream</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Service</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Component</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Charge</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Qty/Rate</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Rate</th>
+              <th style="padding:10px 11px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.55px;font-weight:700;border-bottom:1px solid #edf1f1;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${lineRows || '<tr><td colspan="7" style="padding:20px;text-align:center;color:var(--muted);">No forecast lines for this period and stream</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--line);">
+        <div class="small muted">Based on active pricing components for ${esc(clientName)}</div>
+        <div style="font:700 18px 'Manrope';color:var(--ink);">Total: ${money(total)}</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+        <button class="btn btn-quiet" id="close-preview-modal-btn">Close</button>
+        <button class="btn btn-primary" id="download-preview-pdf">Download as PDF</button>
+      </div>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  // Event handlers
+  const closeModal = () => {
+    overlay.style.animation = "fadeIn 0.15s ease-out reverse";
+    setTimeout(() => {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      state.forecastPreview = null;
+      renderContracts();
+    }, 150);
+  };
+
+  overlay.querySelector("#close-preview-modal").onclick = closeModal;
+  overlay.querySelector("#close-preview-modal-btn").onclick = closeModal;
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeModal();
+  };
+
+  // Download PDF button
+  overlay.querySelector("#download-preview-pdf").onclick = async () => {
+    try {
+      const result = await api(
+        `/api/clients/${preview.clientId}/billing-forecast-pdf?${new URLSearchParams({ start: preview.start, end: preview.end, stream: preview.stream })}`,
+        { method: "POST" }
+      );
+      notify(`Forecast PDF generated: ${result.filename}`);
+      const a = document.createElement("a");
+      a.href = result.download_url;
+      a.download = result.filename;
+      a.click();
+    } catch (e) {
+      notify(e.message);
+    }
+  };
+
+  // Handle Escape key
+  const handleEscape = (e) => {
+    if (e.key === "Escape") closeModal();
+  };
+  document.addEventListener("keydown", handleEscape);
+  // Store cleanup function on overlay
+  overlay._cleanup = () => document.removeEventListener("keydown", handleEscape);
 }
 
 function renderAgreementFacts(agreement) {
