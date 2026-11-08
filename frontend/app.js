@@ -581,10 +581,7 @@ async function renderContracts() {
         </div>
         ${selected && (state.role === "finance" || state.role === "structuring") ? `
           <div style="margin-top:10px;display:flex;gap:8px;align-items:center;">
-            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Preview period start</span><input type="date" id="forecast-start" class="input" value=""></label>
-            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Preview period end</span><input type="date" id="forecast-end" class="input" value=""></label>
-            <label class="control" style="margin:0;min-width:140px;"><span class="field-label">Stream</span><select id="forecast-stream" class="input"><option value="COMBINED">COMBINED</option><option value="SERVICE">SERVICE</option><option value="LEASE">LEASE</option></select></label>
-            <button class="btn btn-secondary" id="preview-billing" style="align-self:end;">Preview Billing</button>
+            <button class="btn btn-secondary" id="preview-billing">Preview Next Billing Cycle</button>
           </div>
         ` : ""}
       </div>
@@ -606,16 +603,6 @@ async function renderContracts() {
     </section>
   </div>`;
 
-  // Set default dates for forecast preview (current month range)
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const formatDate = (d) => d.toISOString().split("T")[0];
-
-  const startInput = $("#forecast-start");
-  const endInput = $("#forecast-end");
-  if (startInput && !startInput.value) startInput.value = formatDate(monthStart);
-  if (endInput && !endInput.value) endInput.value = formatDate(monthEnd);
 
   // Tab switching
   $("#tab-existing").onclick = async () => {
@@ -710,17 +697,19 @@ async function renderContracts() {
     loadAgreementPdf(selected.id).catch((error) => notify(error.message));
   }
 
-  // Preview billing button handler
+  // Preview billing button handler - shows forecast for next monthly billing cycle
   const previewBtn = $("#preview-billing");
   if (previewBtn) {
     previewBtn.onclick = async () => {
-      const start = $("#forecast-start").value;
-      const end = $("#forecast-end").value;
-      const stream = $("#forecast-stream").value;
-      if (!start || !end) {
-        notify("Please select both start and end dates");
-        return;
-      }
+      // Auto-compute next month's billing cycle (one month from today)
+      const today = new Date();
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const monthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+      const formatDate = (d) => d.toISOString().split("T")[0];
+      const start = formatDate(nextMonth);
+      const end = formatDate(monthEnd);
+      const stream = "COMBINED"; // Always show combined view for preview
+
       const client = state.clients.find(c => c.id === state.contractExistingClientId || c.id === selected.client_id);
       const clientId = client?.id || selected.client_id;
       const clientName = client?.name || selected.detected_client_name || "Unknown Client";
