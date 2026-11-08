@@ -708,12 +708,12 @@ async function renderContracts() {
       const formatDate = (d) => d.toISOString().split("T")[0];
       const start = formatDate(nextMonth);
       const end = formatDate(monthEnd);
-      const stream = "COMBINED"; // Always show combined view for preview
+      const agreementType = selected.agreement_type; // "MSA" or "MLA"
+      const stream = agreementType === "MLA" ? "LEASE" : "SERVICE";
 
       const client = state.clients.find(c => c.id === state.contractExistingClientId || c.id === selected.client_id);
       const clientId = client?.id || selected.client_id;
       const clientName = client?.name || selected.detected_client_name || "Unknown Client";
-      const agreementType = selected.agreement_type;
 
       let forecast;
       if (isDraft) {
@@ -779,89 +779,93 @@ function renderEvidence(item, field) {
 
 function computeForecastFromContract(agreement, periodStart, periodEnd) {
   // Compute forecast billing from extracted contract terms (for drafts/previews)
+  // Only show data for the agreement type that is currently open/uploaded
   const extracted = agreement.extracted || {};
+  const agreementType = agreement.agreement_type; // "MSA" or "MLA"
   const lines = [];
   let total = 0.0;
 
-  // Process MSA services
-  if (extracted.services) {
-    for (const service of extracted.services) {
-      if (!service.subscribed) continue;
-      if (service.contract_amount == null) continue;
+  if (agreementType === "MSA") {
+    // Process MSA services
+    if (extracted.services) {
+      for (const service of extracted.services) {
+        if (!service.subscribed) continue;
+        if (service.contract_amount == null) continue;
 
-      const quantity = service.vehicle_count || service.driver_count || 1;
-      const amount = Number(service.contract_amount) * quantity;
-      total += amount;
+        const quantity = service.vehicle_count || service.driver_count || 1;
+        const amount = Number(service.contract_amount) * quantity;
+        total += amount;
 
-      lines.push({
-        service_code: service.service_code,
-        service_name: service.service_name,
-        component_code: service.component_name || "monthly_per_vehicle",
-        component_name: service.component_name ? service.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "Monthly Service",
-        billing_stream: "SERVICE",
-        charge_type: "recurring",
-        quantity: quantity,
-        rate: Number(service.contract_amount),
-        rate_unit: service.rate_unit || "vehicle_month",
-        amount: amount,
-        currency: service.pricing_basis || "USD",
-      });
+        lines.push({
+          service_code: service.service_code,
+          service_name: service.service_name,
+          component_code: service.component_name || "monthly_per_vehicle",
+          component_name: service.component_name ? service.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "Monthly Service",
+          billing_stream: "SERVICE",
+          charge_type: "recurring",
+          quantity: quantity,
+          rate: Number(service.contract_amount),
+          rate_unit: service.rate_unit || "vehicle_month",
+          amount: amount,
+          currency: service.pricing_basis || "USD",
+        });
+      }
     }
-  }
 
-  // Process MSA components (one-time charges like FUEL activation)
-  if (extracted.components) {
-    for (const component of extracted.components) {
-      if (component.contract_amount == null) continue;
+    // Process MSA components (one-time charges like FUEL activation)
+    if (extracted.components) {
+      for (const component of extracted.components) {
+        if (component.contract_amount == null) continue;
 
-      const quantity = component.quantity || 1;
-      const amount = Number(component.contract_amount) * quantity;
-      total += amount;
+        const quantity = component.quantity || 1;
+        const amount = Number(component.contract_amount) * quantity;
+        total += amount;
 
-      lines.push({
-        service_code: component.service_code || "FUEL",
-        service_name: component.service_name || "Fuel",
-        component_code: component.component_name || "activation",
-        component_name: component.component_name ? component.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "One-time Setup",
-        billing_stream: "SERVICE",
-        charge_type: component.charge_type || "one_time",
-        quantity: quantity,
-        rate: Number(component.contract_amount),
-        rate_unit: component.rate_unit || "account",
-        amount: amount,
-        currency: component.pricing_basis || "USD",
-      });
+        lines.push({
+          service_code: component.service_code || "FUEL",
+          service_name: component.service_name || "Fuel",
+          component_code: component.component_name || "activation",
+          component_name: component.component_name ? component.component_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()) : "One-time Setup",
+          billing_stream: "SERVICE",
+          charge_type: component.charge_type || "one_time",
+          quantity: quantity,
+          rate: Number(component.contract_amount),
+          rate_unit: component.rate_unit || "account",
+          amount: amount,
+          currency: component.pricing_basis || "USD",
+        });
+      }
     }
-  }
+  } else if (agreementType === "MLA") {
+    // Process MLA lease
+    if (extracted.lease) {
+      const lease = extracted.lease;
+      const vehicles = lease.vehicles?.length ? lease.vehicles : [lease];
 
-  // Process MLA lease
-  if (extracted.lease) {
-    const lease = extracted.lease;
-    const vehicles = lease.vehicles?.length ? lease.vehicles : [lease];
+      for (const vehicle of vehicles) {
+        if (vehicle.contract_amount == null) continue;
 
-    for (const vehicle of vehicles) {
-      if (vehicle.contract_amount == null) continue;
+        const quantity = vehicle.quantity || 1;
+        const amount = Number(vehicle.contract_amount) * quantity;
+        total += amount;
 
-      const quantity = vehicle.quantity || 1;
-      const amount = Number(vehicle.contract_amount) * quantity;
-      total += amount;
+        const vehicleType = vehicle.vehicle_type ||
+          [vehicle.vehicle_make, vehicle.vehicle_model].filter(Boolean).join(" ");
 
-      const vehicleType = vehicle.vehicle_type ||
-        [vehicle.vehicle_make, vehicle.vehicle_model].filter(Boolean).join(" ");
-
-      lines.push({
-        service_code: vehicle.service_code || "LEASE-01",
-        service_name: vehicle.service_name || "Fleet vehicle lease",
-        component_code: vehicle.component_name || "monthly_lease",
-        component_name: `Monthly Lease - ${vehicleType || "Vehicle"}`,
-        billing_stream: "LEASE",
-        charge_type: "recurring",
-        quantity: quantity,
-        rate: Number(vehicle.contract_amount),
-        rate_unit: vehicle.rate_unit || "vehicle_month",
-        amount: amount,
-        currency: vehicle.pricing_basis || "USD",
-      });
+        lines.push({
+          service_code: vehicle.service_code || "LEASE-01",
+          service_name: vehicle.service_name || "Fleet vehicle lease",
+          component_code: vehicle.component_name || "monthly_lease",
+          component_name: `Monthly Lease - ${vehicleType || "Vehicle"}`,
+          billing_stream: "LEASE",
+          charge_type: "recurring",
+          quantity: quantity,
+          rate: Number(vehicle.contract_amount),
+          rate_unit: vehicle.rate_unit || "vehicle_month",
+          amount: amount,
+          currency: vehicle.pricing_basis || "USD",
+        });
+      }
     }
   }
 
@@ -869,7 +873,7 @@ function computeForecastFromContract(agreement, periodStart, periodEnd) {
     client_id: agreement.client_id || agreement.detected_client_id,
     period_start: periodStart,
     period_end: periodEnd,
-    billing_stream: "COMBINED",
+    billing_stream: agreementType === "MLA" ? "LEASE" : "SERVICE",
     lines: lines,
     total: Math.round(total * 100) / 100,
     line_count: lines.length,
