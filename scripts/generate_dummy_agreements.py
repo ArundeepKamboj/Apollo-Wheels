@@ -14,14 +14,14 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent.parent  # Go up from scripts/ to project root
 sys.path.insert(0, str(ROOT / "src"))
 
 from apollo_wheels_mvp.synthetic import write_demo_agreements  # noqa: E402
 
 DUMMY_CLIENTS = [
-    ("C-9001", "Apex Transport", "apex"),
-    ("C-9002", "Coastal Hauling", "coastal"),
+    ("C-9001", "Apex Transport LP", "apex"),
+    ("C-9002", "Coastal Hauling LLC", "coastal"),
 ]
 
 

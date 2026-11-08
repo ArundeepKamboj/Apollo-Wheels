@@ -11,7 +11,7 @@ import shutil
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parent.parent  # Go up from scripts/ to project root
 
 
 def load_env(path: Path) -> dict[str, str]:
@@ -54,13 +54,22 @@ def main() -> int:
 
     # Delete the generated PDF files (keep the seeded test_uploads/Test_Client files).
     folder = ROOT / "samples" / "test_uploads"
-    for client_id, client_name, prefix in (("C-9001", "Apex Transport", "apex"),
-                                           ("C-9002", "Coastal Hauling", "coastal")):
+    # Delete agreement PDFs
+    for client_id, client_name, prefix in (("C-9001", "Apex Transport LP", "apex"),
+                                           ("C-9002", "Coastal Hauling LLC", "coastal")):
         for kind in ("msa", "mla"):
             path = folder / f"{prefix}_{kind}_v1.pdf"
             if path.is_file():
                 path.unlink()
                 print(f"  removed {path.name}")
+
+    # Delete billing PDFs for dummy clients
+    for client_id, client_name, prefix in (("C-9001", "Apex Transport LP", "apex"),
+                                           ("C-9002", "Coastal Hauling LLC", "coastal")):
+        client_folder = ROOT / "samples" / "billing" / client_name.replace(" ", "_").replace(".", "").replace(",", "")
+        if client_folder.is_dir():
+            shutil.rmtree(client_folder)
+            print(f"  removed {client_folder}")
     return 0
 
 
