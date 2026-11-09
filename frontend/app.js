@@ -4,8 +4,13 @@
 const savedProfile = JSON.parse(
   sessionStorage.getItem("apollo-user") || "null",
 );
+const availablePages = ["overview", "contracts", "pricing", "billing"];
+const savedPage = sessionStorage.getItem("apollo-page");
 const state = {
-  page: "overview",
+  page:
+    sessionStorage.getItem("apollo-token") && availablePages.includes(savedPage)
+      ? savedPage
+      : "overview",
   clientId: "C-1001",
   role: savedProfile?.role || null,
   userId: savedProfile?.user_id || null,
@@ -86,8 +91,15 @@ function showLogin(message = "") {
     .querySelectorAll(".nav")
     .forEach((button) => (button.disabled = true));
   $("#main").innerHTML =
-    `<section class="panel login-panel"><div class="eyebrow">Internal demo</div><h1>Sign in to Wheels</h1><p class="subhead">Use your Finance or Structuring demo account.</p><form id="login-form"><label class="control"><span class="field-label">Username</span><input id="login-username" autocomplete="username" required></label><label class="control"><span class="field-label">Password</span><input id="login-password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit">Sign in</button><div id="login-error" class="error-text">${esc(message)}</div></form><div class="small muted">Demo users: testfinance, testfinance2, teststructurer</div></section>`;
+    `<section class="panel login-panel"><h1>Sign in to Wheels</h1><p class="subhead">Sign in with your account to continue.</p><form id="login-form"><label class="control"><span class="field-label">Username</span><input id="login-username" autocomplete="username" required></label><label class="control"><span class="field-label">Password</span><input id="login-password" type="password" autocomplete="current-password" required></label><button class="btn btn-primary" type="submit">Sign in</button><div id="login-error" class="error-text">${esc(message)}</div></form></section>`;
   $("#login-form").onsubmit = login;
+}
+function syncNavigationAccess() {
+  const restrictedPages = new Set(["pricing", "billing"]);
+  document.querySelectorAll(".nav").forEach((button) => {
+    button.hidden =
+      state.role === "structuring" && restrictedPages.has(button.dataset.page);
+  });
 }
 async function login(event) {
   event.preventDefault();
@@ -108,7 +120,9 @@ async function login(event) {
     state.userId = data.user_id;
     state.role = data.role;
     state.displayName = data.display_name;
+    state.page = "overview";
     sessionStorage.setItem("apollo-token", state.token);
+    sessionStorage.setItem("apollo-page", state.page);
     sessionStorage.setItem(
       "apollo-user",
       JSON.stringify({
@@ -118,6 +132,7 @@ async function login(event) {
       }),
     );
     $("#user-label").textContent = `${state.displayName} (${state.role})`;
+    syncNavigationAccess();
     document
       .querySelectorAll(".nav")
       .forEach((button) => (button.disabled = false));
@@ -131,10 +146,13 @@ function logout() {
   state.role = null;
   state.userId = null;
   state.displayName = null;
+  state.page = "overview";
+  syncNavigationAccess();
   if (state.page === "contracts") state.clientId = null;
   state.selectedAgreement = null;
   sessionStorage.removeItem("apollo-token");
   sessionStorage.removeItem("apollo-user");
+  sessionStorage.removeItem("apollo-page");
   $("#user-label").textContent = "Signed out";
   showLogin();
 }
@@ -387,6 +405,14 @@ function bindEvidenceHighlights() {
     });
 }
 async function render() {
+  if (
+    state.role === "structuring" &&
+    ["pricing", "billing"].includes(state.page)
+  ) {
+    state.page = "overview";
+  }
+  if (state.token) sessionStorage.setItem("apollo-page", state.page);
+  syncNavigationAccess();
   nav();
   $("#main").classList.toggle("contract-page", state.page === "contracts");
   document.querySelectorAll(".nav").forEach((button) => {
@@ -414,10 +440,12 @@ async function render() {
 async function renderOverview() {
   const counts = state.apiData.counts;
   let summary = { clients: [], clients_with_issues: 0, discrepancy_count: 0 };
-  try {
-    summary = await api("/api/audit/summary");
-  } catch (error) {
-    summary.load_error = error.message;
+  if (state.role !== "structuring") {
+    try {
+      summary = await api("/api/audit/summary");
+    } catch (error) {
+      summary.load_error = error.message;
+    }
   }
 
   const clientRows = summary.clients
@@ -438,18 +466,18 @@ async function renderOverview() {
   $("#main").innerHTML =
     `${head("Apollo Wheels - Internal workspace", "Contract & billing control", "Review agreements, activate pricing with a second-person check, and find billing differences.")}
     <div class="cards">
-      <div class="metric"><div class="metric-label">Synthetic clients</div><div class="metric-value">${counts.clients}</div><div class="metric-note">Demo records</div></div>
+      <div class="metric"><div class="metric-label">Clients</div><div class="metric-value">${counts.clients}</div><div class="metric-note">Active clients</div></div>
       <div class="metric"><div class="metric-label">Agreements</div><div class="metric-value">${counts.agreements}</div><div class="metric-note">MSA and MLA linked by client</div></div>
-      <div class="metric"><div class="metric-label">Pending approvals</div><div class="metric-value">${counts.pending_approvals}</div><div class="metric-note">Four-eyes workflow</div></div>
-      <div class="metric"><div class="metric-label">Clients with findings</div><div class="metric-value">${summary.clients_with_issues}</div><div class="metric-note">${summary.discrepancy_count} line findings</div></div>
+      ${state.role !== "structuring" ? `<div class="metric"><div class="metric-label">Pending approvals</div><div class="metric-value">${counts.pending_approvals}</div><div class="metric-note">Four-eyes workflow</div></div>
+      <div class="metric"><div class="metric-label">Clients with findings</div><div class="metric-value">${summary.clients_with_issues}</div><div class="metric-note">${summary.discrepancy_count} line findings</div></div>` : ""}
     </div>
     <div class="split">
       <section class="panel">
         <div class="panel-head"><div><h2>Work in progress</h2><div class="panel-desc">Structuring reviews contract terms; Finance prepares pricing and a different Finance user approves.</div></div><span class="pill">13 services</span></div>
         <div class="notice"><b>Structuring</b> uploads and edits extracted contract details. <b>Finance</b> reviews those terms, enters pricing, and requests approval. A different Finance user approves before pricing becomes active.</div>
-        <div class="row"><button class="btn btn-primary" onclick="go('contracts')">Review contracts</button><button class="btn btn-secondary" onclick="go('pricing')">Open pricing queue</button></div>
+        <div class="row"><button class="btn btn-primary" onclick="go('contracts')">Open Contract</button>${state.role !== "structuring" ? '<button class="btn btn-secondary" onclick="go(\'pricing\')">Open Pricing</button>' : ""}</div>
       </section>
-      <section class="panel">
+      ${state.role !== "structuring" ? `<section class="panel">
         <div class="panel-head"><div><h2>Billing audit</h2><div class="panel-desc">Compare contract, active pricing, and billed line items by period.</div></div></div>
         <div class="audit-summary">
           <div class="audit-stat"><span>Selected client</span><strong>${esc(state.clients.find((client) => client.id === state.clientId)?.name || "")}</strong></div>
@@ -457,9 +485,9 @@ async function renderOverview() {
           <div class="audit-stat"><span>Source</span><strong>Selectable PDF</strong></div>
         </div>
         <button class="btn btn-quiet" onclick="go('billing')">View billing audit</button>
-      </section>
+      </section>` : ""}
     </div>
-    <section class="panel">
+    ${state.role !== "structuring" ? `<section class="panel">
       <div class="panel-head"><div><h2>Client audit summary</h2><div class="panel-desc">Clients with flagged service, pricing, quantity, or billing differences.</div></div></div>
       ${
         summary.load_error
@@ -468,11 +496,15 @@ async function renderOverview() {
             ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Invoices reviewed</th><th>Status</th><th>Example findings</th></tr></thead><tbody>${clientRows}</tbody></table></div>`
             : '<div class="empty">No clients have been seeded.</div>'
       }
-    </section>
-    <div class="notice amber"><b>Demo data:</b> all clients, agreements, prices, and billing are synthetic. Deterministic sample parsing is the default; an optional local model path is documented separately.</div>`;
+    </section>` : ""}
+    `;
 }
 
 function go(page) {
+  if (state.role === "structuring" && ["pricing", "billing"].includes(page)) {
+    notify("This section is available to Finance users only.");
+    return;
+  }
   if (page === "contracts" && state.page !== "contracts") {
     state.contractExistingClientId = null;
     state.contractUploadClientId = null;
@@ -486,6 +518,7 @@ function go(page) {
     state.clientId = state.clients[0]?.id || null;
   }
   state.page = page;
+  sessionStorage.setItem("apollo-page", page);
   render();
 }
 function contractClientOptions(selectedId) {
@@ -518,8 +551,8 @@ async function renderContracts() {
   $("#main").innerHTML =
     `${head("Contract workspace", "Agreement review", "View a stored client agreement, or upload a new agreement for extraction.", `<span class="tag neutral">${state.role === "structuring" ? "Structuring can edit terms" : "Finance view is read-only"}</span>`)}
   <div class="contract-tabs" role="tablist" aria-label="Contract source">
-    <button class="tab-btn ${state.contractMode === "existing" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "existing"}" data-tab="existing" id="tab-existing">View Existing Agreement</button>
-    <button class="tab-btn ${state.contractMode === "upload" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "upload"}" data-tab="upload" id="tab-upload">Upload New Agreement</button>
+    <button class="tab-btn ${state.contractMode === "existing" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "existing"}" data-tab="existing" id="tab-existing">Existing Aggrement</button>
+    <button class="tab-btn ${state.contractMode === "upload" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "upload"}" data-tab="upload" id="tab-upload">Agreement</button>
   </div>
 
   ${
@@ -1436,7 +1469,7 @@ async function renderPricing() {
     `${head("Pricing service", "Pricing setup & approval", "Finance owns pricing. One person submits; a different Finance user approves before activation.", `<div class="toolbar">${clientPicker()}</div>`)}
 <div class="notice"><b>Data design:</b> each charge component is a separately versioned record. Common pricing fields are indexed; optional pricing-specific fields stay in a flexible terms payload. Activation writes to the internal pricing database.</div>
 <section class="panel"><div class="panel-head"><div><h2>Active pricing</h2><div class="panel-desc">${active.length} active component records Â· retained versions remain available for history</div></div><span class="tag good">${active.length ? "Active" : "No active setup"}</span></div>${active.length ? `<div class="table-wrap"><table><thead><tr><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Rate</th><th>Rate unit</th><th>Qty</th><th>Frequency</th><th>Version</th></tr></thead><tbody>${active.map((c) => `<tr><td>${esc(c.billing_stream)}</td><td>${esc(c.service_name)}</td><td>${esc(c.component_name)}</td><td>${esc(c.charge_type)}</td><td>${displayRate(c)}</td><td>${esc(c.rate_unit)}</td><td>${c.quantity}</td><td>${esc(c.billing_frequency)}</td><td>v${c.version}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No active pricing records.</div>'}</section>
-<div class="split"><section class="panel"><div class="panel-head"><div><h2>Prepare pricing version</h2><div class="panel-desc">Choose the agreement set, review each charge, then send to a second Finance approver.</div></div></div><div class="row"><button class="btn btn-secondary" id="load-contract-pricing" ${state.role !== "finance" ? "disabled" : ""}>Load subscribed contract terms</button><button class="btn btn-quiet" id="add-component" ${state.role !== "finance" ? "disabled" : ""}>+ Add component</button></div><div id="pricing-editor" class="pricing-list" style="margin-top:12px"></div><div class="row spread" style="margin-top:14px"><span class="small muted">Submitter: ${esc(state.userId)}</span><button class="btn btn-primary" id="submit-pricing" ${state.role !== "finance" ? "disabled" : ""}>Request second-person approval</button></div></section>
+<div class="split"><section class="panel"><div class="panel-head"><div><h2>Prepare pricing version</h2><div class="panel-desc">Choose the agreement set, review each charge, then send to a second Finance approver.</div></div></div><div class="row"><button class="btn btn-secondary" id="load-contract-pricing" ${state.role !== "finance" ? "disabled" : ""}>Load subscribed contract terms</button><button class="btn btn-quiet" id="add-component" ${state.role !== "finance" ? "disabled" : ""}>+ Add component</button></div><div id="pricing-editor" class="pricing-list" style="margin-top:12px"></div><div class="row spread" style="margin-top:14px"><span class="small muted">Submitter: ${esc(state.userId)}</span><button class="btn btn-primary" id="submit-pricing" ${state.role !== "finance" ? "disabled" : ""}>Submit</button></div></section>
 <section class="panel"><div class="panel-head"><div><h2>Four-eyes queue</h2><div class="panel-desc">Review the submitted rates and terms before a different Finance user approves.</div></div><span class="tag ${pending.length ? "warn" : "good"}">${pending.length} pending</span></div>${pending.length ? pending.map((r) => `<div class="approval"><h3>Pricing version v${r.version}</h3><div class="approval-meta">Initiated by ${esc(r.initiated_by)} Â· ${esc(r.created_at)} Â· ${esc(r.id.slice(0, 8))}</div><button class="btn btn-primary review-pricing-btn" data-id="${esc(r.id)}">Review pricing details</button>${r.initiated_by === state.userId ? '<div class="small muted" style="margin-top:7px">Sign in as a different Finance user to approve.</div>' : ""}</div>`).join("") : '<div class="empty">No pricing requests are waiting for approval.</div>'}</section></div>`;
   bindClient();
   renderPricingEditor();
@@ -1754,10 +1787,10 @@ async function renderBilling() {
   const client = state.clients.find((c) => c.id === state.clientId);
   $("#main").innerHTML =
     `${head("Billing workspace", "Billing audit & history", "Ingest billing PDFs, compare billed line items with contract and active pricing, and inspect service-level history.", `<div class="toolbar">${clientPicker()}</div>`)}
-  <div class="split"><section class="panel"><div class="panel-head"><div><h2>Ingest billing PDF</h2><div class="panel-desc">Selectable-text billing PDF Â· synthetic demo format</div></div></div><form id="billing-upload" class="filebox"><input type="file" name="file" accept="application/pdf" required><button class="btn btn-primary" style="margin-top:10px">Upload and compare</button></form></section><section class="panel"><div class="panel-head"><div><h2>Invoice preferences</h2><div class="panel-desc">Client setting is controlled by internal Finance.</div></div></div><label class="checkline"><input id="history-toggle" type="checkbox" ${client?.include_history_on_invoice ? "checked" : ""} ${state.role !== "finance" ? "disabled" : ""}> Include prior billing history in generated pricing PDFs</label><div class="notice">Client-facing email/PDF delivery is a later phase. This setting is retained as a future invoice preference.</div></section></div>
+  <div class="split"><section class="panel"><div class="panel-head"><div><h2>Ingest billing PDF</h2><div class="panel-desc">Upload a selectable-text billing PDF for processing.</div></div></div><form id="billing-upload" class="filebox"><input type="file" name="file" accept="application/pdf" required><button class="btn btn-primary" style="margin-top:10px">Upload and compare</button></form></section><section class="panel"><div class="panel-head"><div><h2>Invoice preferences</h2><div class="panel-desc">Client setting is controlled by internal Finance.</div></div></div><label class="checkline"><input id="history-toggle" type="checkbox" ${client?.include_history_on_invoice ? "checked" : ""} ${state.role !== "finance" ? "disabled" : ""}> Include prior billing history in generated pricing PDFs</label><div class="notice">Client-facing email/PDF delivery is a later phase. This setting is retained as a future invoice preference.</div></section></div>
   <section class="panel"><div class="panel-head"><div><h2>Combined billing view (service + lease)</h2><div class="panel-desc">All periods grouped with service and lease charges together, preserving stream labels.</div></div><div class="toolbar"><input id="combined-start" class="input" type="date"><input id="combined-end" class="input" type="date"><button id="filter-combined" class="btn btn-quiet">Filter periods</button><button id="generate-bill" class="btn btn-secondary">Generate actual bill</button></div></div>${renderCombinedBilling(combined)}</section>
-  <section class="panel" style="display:none"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Exceptions are based on synthetic inputs; use the PDF source and agreement stream to investigate.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date"><input id="audit-end" class="input" type="date"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div>${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</section>
-  <section class="panel" style="display:none"><div class="panel-head"><div><h2>Billing history</h2><div class="panel-desc">Line-level view across invoice periods; service and lease streams stay distinct.</div></div><div class="toolbar"><input id="history-start" class="input" type="date"><input id="history-end" class="input" type="date"><button id="filter-history" class="btn btn-quiet">Filter</button></div></div>${history.length ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${history.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No billing history has been ingested.</div>'}</section>`;
+  <section class="panel"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Use the PDF source and agreement stream to investigate exceptions.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date"><input id="audit-end" class="input" type="date"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div>${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</section>
+  <section class="panel"><div class="panel-head"><div><h2>Billing history</h2><div class="panel-desc">Line-level view across invoice periods; service and lease streams stay distinct.</div></div><div class="toolbar"><input id="history-start" class="input" type="date"><input id="history-end" class="input" type="date"><button id="filter-history" class="btn btn-quiet">Filter</button></div></div>${history.length ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${history.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No billing history has been ingested.</div>'}</section>`;
   bindClient();
   $("#billing-upload").onsubmit = uploadBilling;
   $("#history-toggle").onchange = async (e) => {

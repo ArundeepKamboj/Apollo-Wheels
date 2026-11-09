@@ -53,18 +53,80 @@ test("login is required and displays the authenticated Finance user", async ({
   ).toBeVisible();
 });
 
-test("overview shows the internal demo and all workflow navigation", async ({
+test("refresh preserves the current page but sign-in starts at Overview", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await signIn(page);
+  await expect(
+    page.getByRole("heading", { name: "Contract & billing control" }),
+  ).toBeVisible();
+
+  await page.locator('.nav[data-page="pricing"]').click();
+  await expect(
+    page.getByRole("heading", { name: "Pricing setup & approval" }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Pricing setup & approval" }),
+  ).toBeVisible();
+
+  await signIn(page);
+  await expect(
+    page.getByRole("heading", { name: "Contract & billing control" }),
+  ).toBeVisible();
+});
+
+test("overview shows workspace content without demo data labels", async ({
   page,
 }) => {
   await openWorkspace(page);
   await expect(page.locator("#main")).toContainText(
     "Apollo Wheels - Internal workspace",
   );
+  await expect(page.locator("#main")).toContainText("Clients");
+  await expect(page.locator("#main")).not.toContainText(/demo|synthetic/i);
+  await expect(page.locator(".sidebar-bottom")).toContainText(
+    "Workspace active",
+  );
+  await expect(page.locator(".sidebar-bottom")).not.toContainText(
+    /demo|synthetic/i,
+  );
+  await expect(page.locator(".internal-badge")).toHaveCount(0);
   await expect(page.locator(".nav")).toHaveCount(4);
+  await expect(page.locator('.nav[data-page="contracts"]')).toContainText(
+    "Contract",
+  );
+  await expect(page.locator('.nav[data-page="pricing"]')).toContainText(
+    "Pricing",
+  );
   await expect(page.getByText("13 services", { exact: true })).toBeVisible();
   await expect(page.locator(".audit-stat strong").first()).toHaveText(
     "Northstar Fleet Services",
   );
+});
+
+test("Structuring users only see Overview and Contract sections", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await signIn(page, "teststructurer", "StructuringDemo!2026");
+
+  await expect(page.locator('.nav[data-page="overview"]')).toBeVisible();
+  await expect(page.locator('.nav[data-page="contracts"]')).toBeVisible();
+  await expect(page.locator('.nav[data-page="pricing"]')).toBeHidden();
+  await expect(page.locator('.nav[data-page="billing"]')).toBeHidden();
+  await expect(page.locator("#main")).not.toContainText("Pending approvals");
+  await expect(page.locator("#main")).not.toContainText("Billing audit");
+  await expect(page.locator("#main")).not.toContainText("Client audit summary");
+
+  await page.locator('.nav[data-page="contracts"]').click();
+  await expect(page.locator("#tab-existing")).toHaveText("Existing Aggrement");
+  await expect(page.locator("#tab-upload")).toHaveText("Agreement");
+  await page.evaluate(() => go("pricing"));
+  await expect(
+    page.getByRole("heading", { name: "Source document" }),
+  ).toBeVisible();
 });
 
 test("contract workspace shows source and role-specific editing after login", async ({

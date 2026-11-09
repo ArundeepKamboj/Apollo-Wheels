@@ -136,6 +136,9 @@ button {
   gap:12px;
   font-size:13px
 }
+.nav[hidden] {
+  display:none
+}
 .nav span {
   width:17px;
   font-size:17px;
@@ -914,4 +917,3 @@ td input,td select {
 }
 
 }
-
