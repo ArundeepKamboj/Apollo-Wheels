@@ -410,27 +410,171 @@ test("Finance pricing request requires a different authenticated Finance approve
   await expect(page.locator("#toast")).toContainText("now active");
 });
 
-test("billing audit shows comparison, hides history, and rejects duplicate invoices", async ({
+test("Finance can edit service and component names before submitting pricing", async ({
   page,
 }) => {
   await openWorkspace(page);
+  await page.locator('.nav[data-page="pricing"]').click();
+  await page.locator("#add-component").click();
+
+  await page.locator('[data-field="service_name"]').fill("Roadside support");
+  await page.locator('[data-field="component_name"]').fill("Per event fee");
+
+  let submittedRequest;
+  await page.route("**/api/pricing/requests", async (route) => {
+    submittedRequest = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: "pricing-edit-test",
+        client_id: "C-1001",
+        version: 99,
+        status: "pending_approval",
+      }),
+    });
+  });
+  await page.locator("#submit-pricing").click();
+
+  await expect(page.locator("#toast")).toContainText(
+    "waiting for second approval",
+  );
+  expect(submittedRequest.components[0]).toMatchObject({
+    service_name: "Roadside support",
+    service_code: "ROADSIDE_SUPPORT",
+    component_name: "Per event fee",
+    component_code: "per_event_fee",
+  });
+});
+
+test("billing audit shows comparison, hides history, and rejects duplicate invoices", async ({
+  page,
+}) => {
+  let auditRequest;
+  let combinedRequest;
+  await page.route("**/api/clients/*/audit**", async (route) => {
+    auditRequest = new URL(route.request().url());
+    await route.continue();
+  });
+  await page.route("**/api/clients/*/billing-combined**", async (route) => {
+    combinedRequest = new URL(route.request().url());
+    await route.continue();
+  });
+  await openWorkspace(page);
   await page.locator('.nav[data-page="billing"]').click();
-  await expect(page.locator("#audit-panel")).toBeVisible();
-  await expect(page.locator("#history-panel")).toBeHidden();
+  await expect(page.locator("#audit-view")).toBeVisible();
+  await expect(page.locator("#history-view")).toBeHidden();
+  const previousMonth = await page.evaluate(() => {
+    const today = new Date();
+    const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const end = new Date(today.getFullYear(), today.getMonth(), 0);
+    const formatDate = (date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return { start: formatDate(start), end: formatDate(end) };
+  });
+  await expect(page.locator("#audit-start")).toHaveValue(previousMonth.start);
+  await expect(page.locator("#audit-end")).toHaveValue(previousMonth.end);
+  expect(auditRequest.searchParams.get("start")).toBe(previousMonth.start);
+  expect(auditRequest.searchParams.get("end")).toBe(previousMonth.end);
+  await page.locator("#billing-history-tab").click();
+  await expect(page.locator("#history-view")).toBeVisible();
+  await expect(page.locator("#audit-view")).toBeHidden();
+  await expect(page.locator("#combined-panel")).toContainText(
+    "Bill history (service + lease)",
+  );
+  await expect(page.locator("#combined-start")).toHaveValue(previousMonth.start);
+  await expect(page.locator("#combined-end")).toHaveValue(previousMonth.end);
+  expect(combinedRequest.searchParams.get("start")).toBe(previousMonth.start);
+  expect(combinedRequest.searchParams.get("end")).toBe(previousMonth.end);
+  await page.locator("#billing-audit-tab").click();
+  await expect(page.locator("#audit-view")).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles(sampleInvoice);
   await page.locator("#billing-upload button").click();
   await expect(page.locator("#toast")).toContainText("has already been uploaded");
 });
 
-test("Finance controls invoice-history preference and Structuring cannot change it", async ({
+test("workspace sidebar stays visible while scrolling on desktop and mobile", async ({
+  page,
+}) => {
+  await openWorkspace(page);
+  await page.locator("#main").evaluate((main) => {
+    main.style.minHeight = "1800px";
+  });
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, 600));
+    const positions = await page.evaluate(() => ({
+      topbarBottom: document.querySelector(".topbar").getBoundingClientRect().bottom,
+      sidebarTop: document.querySelector(".sidebar").getBoundingClientRect().top,
+    }));
+    expect(positions.sidebarTop).toBeGreaterThanOrEqual(
+      positions.topbarBottom - 1,
+    );
+    expect(positions.sidebarTop).toBeLessThanOrEqual(
+      positions.topbarBottom + 1,
+    );
+  }
+});
+
+test("billing comparison does not show invoice preferences", async ({
   page,
 }) => {
   await openWorkspace(page);
   await page.locator('.nav[data-page="billing"]').click();
-  await expect(page.locator("#history-toggle")).toBeEnabled();
-  await signIn(page, "teststructurer", "StructuringDemo!2026");
+  await expect(page.locator("#audit-view")).not.toContainText(
+    "Invoice preferences",
+  );
+  await expect(page.locator("#history-toggle")).toHaveCount(0);
+});
+
+test("filtered bill comparison replaces the no-lines message with results", async ({
+  page,
+}) => {
+  let auditCalls = 0;
+  await page.route("**/api/clients/*/audit**", async (route) => {
+    auditCalls += 1;
+    const report =
+      auditCalls === 1
+        ? { client: { id: "C-1001", name: "Northstar" }, rows: [], invoice_count: 0, discrepancy_count: 0 }
+        : {
+            client: { id: "C-1001", name: "Northstar" },
+            rows: [
+              {
+                period_start: "2026-10-01",
+                billing_stream: "SERVICE",
+                service_name: "Fuel",
+                component_name: "Base",
+                contracted: true,
+                configured: true,
+                contract_rate: 10,
+                contract_basis: "USD",
+                expected_rate: 10,
+                pricing_basis: "USD",
+                billed_rate: 10,
+                billed_amount: 100,
+                issue: null,
+                explanation: "Rates match.",
+              },
+            ],
+            invoice_count: 1,
+            discrepancy_count: 0,
+          };
+    await route.fulfill({ json: report });
+  });
+  await openWorkspace(page);
   await page.locator('.nav[data-page="billing"]').click();
-  await expect(page.locator("#history-toggle")).toBeDisabled();
+  await expect(page.locator("#audit-results")).toContainText(
+    "No billing lines found in this period.",
+  );
+  await page.locator("#filter-audit").click();
+  await expect(page.locator("#audit-results .table-wrap")).toBeVisible();
+  await expect(page.locator("#audit-results")).toContainText("Fuel");
+  await expect(page.locator("#audit-results")).not.toContainText(
+    "No billing lines found in this period.",
+  );
 });
 
 test("overview renders a recoverable message when an API request fails", async ({

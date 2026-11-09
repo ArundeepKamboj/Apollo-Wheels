@@ -36,3 +36,6 @@ now let's start making the plan for our presentation/demo based on below for thi
   don't write the plan file and directly do the code changes.
   use friendly labels and yes date pickers should be in current month range
   
+
+  now in ## Contract vs pricing vs billing section there seems to be an issue. since i uploaded the bill with Period Start 2026-02-01
+Period End 2026-02-28 but whrn i said that upload and compare it did against all period dates whcih is wrong. it should by default compare gainst that period date only and also should not have filter of dates in this section.

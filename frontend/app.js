@@ -34,6 +34,7 @@ const state = {
   billingEnd: "",
   billingMin: "",
   billingMax: "",
+  billingTab: "audit",
   // Forecast billing preview modal state
   forecastPreview: null, // { clientId, clientName, agreementType, start, end, stream, data }
 };
@@ -1470,7 +1471,7 @@ async function renderPricing() {
 <div class="notice"><b>Data design:</b> each charge component is a separately versioned record. Common pricing fields are indexed; optional pricing-specific fields stay in a flexible terms payload. Activation writes to the internal pricing database.</div>
 <section class="panel"><div class="panel-head"><div><h2>Active pricing</h2><div class="panel-desc">${active.length} active component records Â· retained versions remain available for history</div></div><span class="tag good">${active.length ? "Active" : "No active setup"}</span></div>${active.length ? `<div class="table-wrap"><table><thead><tr><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Rate</th><th>Rate unit</th><th>Qty</th><th>Frequency</th><th>Version</th></tr></thead><tbody>${active.map((c) => `<tr><td>${esc(c.billing_stream)}</td><td>${esc(c.service_name)}</td><td>${esc(c.component_name)}</td><td>${esc(c.charge_type)}</td><td>${displayRate(c)}</td><td>${esc(c.rate_unit)}</td><td>${c.quantity}</td><td>${esc(c.billing_frequency)}</td><td>v${c.version}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No active pricing records.</div>'}</section>
 <div class="split"><section class="panel"><div class="panel-head"><div><h2>Prepare pricing version</h2><div class="panel-desc">Choose the agreement set, review each charge, then send to a second Finance approver.</div></div></div><div class="row"><button class="btn btn-secondary" id="load-contract-pricing" ${state.role !== "finance" ? "disabled" : ""}>Load subscribed contract terms</button><button class="btn btn-quiet" id="add-component" ${state.role !== "finance" ? "disabled" : ""}>+ Add component</button></div><div id="pricing-editor" class="pricing-list" style="margin-top:12px"></div><div class="row spread" style="margin-top:14px"><span class="small muted">Submitter: ${esc(state.userId)}</span><button class="btn btn-primary" id="submit-pricing" ${state.role !== "finance" ? "disabled" : ""}>Submit</button></div></section>
-<section class="panel"><div class="panel-head"><div><h2>Four-eyes queue</h2><div class="panel-desc">Review the submitted rates and terms before a different Finance user approves.</div></div><span class="tag ${pending.length ? "warn" : "good"}">${pending.length} pending</span></div>${pending.length ? pending.map((r) => `<div class="approval"><h3>Pricing version v${r.version}</h3><div class="approval-meta">Initiated by ${esc(r.initiated_by)} Â· ${esc(r.created_at)} Â· ${esc(r.id.slice(0, 8))}</div><button class="btn btn-primary review-pricing-btn" data-id="${esc(r.id)}">Review pricing details</button>${r.initiated_by === state.userId ? '<div class="small muted" style="margin-top:7px">Sign in as a different Finance user to approve.</div>' : ""}</div>`).join("") : '<div class="empty">No pricing requests are waiting for approval.</div>'}</section></div>`;
+<section class="panel"><div class="panel-head"><div><h2>Pending approval</h2><div class="panel-desc">Review the submitted rates and terms before a different Finance user approves.</div></div><span class="tag ${pending.length ? "warn" : "good"}">${pending.length} pending</span></div>${pending.length ? pending.map((r) => `<div class="approval"><h3>Pricing version v${r.version}</h3><div class="approval-meta">Initiated by ${esc(r.initiated_by)} Â· ${esc(r.created_at)} Â· ${esc(r.id.slice(0, 8))}</div><button class="btn btn-primary review-pricing-btn" data-id="${esc(r.id)}">Review pricing details</button>${r.initiated_by === state.userId ? '<div class="small muted" style="margin-top:7px">Sign in as a different Finance user to approve.</div>' : ""}</div>`).join("") : '<div class="empty">No pricing requests are waiting for approval.</div>'}</section></div>`;
   bindClient();
   renderPricingEditor();
   $("#load-contract-pricing").onclick = loadDraftFromContracts;
@@ -1518,7 +1519,7 @@ function renderPricingEditor() {
   host.innerHTML = state.pricingDraft
     .map(
       (c, i) =>
-        `<div class="pricing-row" data-row="${i}"><div class="control"><label>Service / component</label><div class="small"><b>${esc(c.service_name)}</b><br>${esc(c.component_name)}</div></div><div class="control"><label>Stream</label><select data-field="billing_stream"><option ${c.billing_stream === "SERVICE" ? "selected" : ""}>SERVICE</option><option ${c.billing_stream === "LEASE" ? "selected" : ""}>LEASE</option></select></div><div class="control"><label>Charge type</label><select data-field="charge_type"><option value="recurring" ${c.charge_type === "recurring" ? "selected" : ""}>Recurring</option><option value="one_time" ${c.charge_type === "one_time" ? "selected" : ""}>One-time</option></select></div><div class="control"><label>Amount</label><input data-field="amount" type="number" min="0" step="0.01" value="${Number(c.amount || 0)}"></div><div class="control"><label>Price format</label><select data-term="pricing_basis"><option value="USD" ${c.terms?.pricing_basis === "USD" ? "selected" : ""}>USD</option><option value="PERCENTAGE" ${c.terms?.pricing_basis === "PERCENTAGE" ? "selected" : ""}>Percentage</option><option value="BASIS_POINTS" ${c.terms?.pricing_basis === "BASIS_POINTS" ? "selected" : ""}>Basis points</option></select></div><div class="control"><label>Rate unit</label><input data-field="rate_unit" value="${esc(c.rate_unit)}"></div><div class="control"><label>Quantity</label><input data-field="quantity" type="number" min="0" step="1" value="${Number(c.quantity || 1)}"></div><button class="icon-btn" data-remove="${i}" title="Remove component">Ã—</button></div>`,
+        `<div class="pricing-row" data-row="${i}"><div class="control"><label>Service</label><input data-field="service_name" value="${esc(c.service_name)}"></div><div class="control"><label>Component</label><input data-field="component_name" value="${esc(c.component_name)}"></div><div class="control"><label>Stream</label><select data-field="billing_stream"><option ${c.billing_stream === "SERVICE" ? "selected" : ""}>SERVICE</option><option ${c.billing_stream === "LEASE" ? "selected" : ""}>LEASE</option></select></div><div class="control"><label>Charge type</label><select data-field="charge_type"><option value="recurring" ${c.charge_type === "recurring" ? "selected" : ""}>Recurring</option><option value="one_time" ${c.charge_type === "one_time" ? "selected" : ""}>One-time</option></select></div><div class="control"><label>Amount</label><input data-field="amount" type="number" min="0" step="0.01" value="${Number(c.amount || 0)}"></div><div class="control"><label>Price format</label><select data-term="pricing_basis"><option value="USD" ${c.terms?.pricing_basis === "USD" ? "selected" : ""}>USD</option><option value="PERCENTAGE" ${c.terms?.pricing_basis === "PERCENTAGE" ? "selected" : ""}>Percentage</option><option value="BASIS_POINTS" ${c.terms?.pricing_basis === "BASIS_POINTS" ? "selected" : ""}>Basis points</option></select></div><div class="control"><label>Rate unit</label><input data-field="rate_unit" value="${esc(c.rate_unit)}"></div><div class="control"><label>Quantity</label><input data-field="quantity" type="number" min="0" step="1" value="${Number(c.quantity || 1)}"></div><button class="icon-btn" data-remove="${i}" title="Remove component">Ã—</button></div>`,
     )
     .join("");
   host.querySelectorAll("[data-field]").forEach(
@@ -1526,9 +1527,23 @@ function renderPricingEditor() {
       (el.onchange = () => {
         const row = el.closest("[data-row]");
         const c = state.pricingDraft[Number(row.dataset.row)];
-        c[el.dataset.field] = ["amount", "quantity"].includes(el.dataset.field)
+        const field = el.dataset.field;
+        c[field] = ["amount", "quantity"].includes(field)
           ? Number(el.value)
           : el.value;
+        if (field === "service_name") {
+          c.service_code = el.value
+            .trim()
+            .replace(/[^A-Za-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .toUpperCase();
+        } else if (field === "component_name") {
+          c.component_code = el.value
+            .trim()
+            .replace(/[^A-Za-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .toLowerCase();
+        }
       }),
   );
   host.querySelectorAll("[data-term]").forEach(
@@ -1672,6 +1687,16 @@ async function submitPricing() {
     notify("Load at least one contract charge");
     return;
   }
+  if (
+    components.some(
+      (component) =>
+        !String(component.service_name || "").trim() ||
+        !String(component.component_name || "").trim(),
+    )
+  ) {
+    notify("Enter a service and component name for every pricing charge");
+    return;
+  }
   try {
     const result = await api("/api/pricing/requests", {
       method: "POST",
@@ -1778,37 +1803,56 @@ function renderPricingApprovalModal(request, components) {
   };
   document.addEventListener("keydown", handleEscape);
 }
+function previousCalendarMonthRange() {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const end = new Date(today.getFullYear(), today.getMonth(), 0);
+  const formatDate = (date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return { start: formatDate(start), end: formatDate(end) };
+}
+
 async function renderBilling() {
-  const [history, audit, combined] = await Promise.all([
-    api(`/api/clients/${state.clientId}/billing-history`),
-    api(`/api/clients/${state.clientId}/audit`),
-    api(`/api/clients/${state.clientId}/billing-combined`),
+  const auditRange = previousCalendarMonthRange();
+  const historyRange = previousCalendarMonthRange();
+  const [audit, combined] = await Promise.all([
+    api(
+      `/api/clients/${state.clientId}/audit?${new URLSearchParams(auditRange)}`,
+    ),
+    api(
+      `/api/clients/${state.clientId}/billing-combined?${new URLSearchParams(historyRange)}`,
+    ),
   ]);
-  const client = state.clients.find((c) => c.id === state.clientId);
   $("#main").innerHTML =
     `${head("Billing workspace", "Billing audit", "Ingest billing PDFs and compare billed line items with contract and active pricing.", `<div class="toolbar">${clientPicker()}</div>`)}
-  <div class="split"><section class="panel"><div class="panel-head"><div><h2>Ingest billing PDF</h2><div class="panel-desc">Upload a selectable-text billing PDF for processing.</div></div></div><form id="billing-upload" class="filebox"><input type="file" name="file" accept="application/pdf" required><button class="btn btn-primary" style="margin-top:10px">Upload and compare</button></form></section><section class="panel"><div class="panel-head"><div><h2>Invoice preferences</h2><div class="panel-desc">Client setting is controlled by internal Finance.</div></div></div><label class="checkline"><input id="history-toggle" type="checkbox" ${client?.include_history_on_invoice ? "checked" : ""} ${state.role !== "finance" ? "disabled" : ""}> Include prior billing history in generated pricing PDFs</label><div class="notice">Client-facing email/PDF delivery is a later phase. This setting is retained as a future invoice preference.</div></section></div>
-  <section id="combined-panel" class="panel"><div class="panel-head"><div><h2>Combined billing view (service + lease)</h2><div class="panel-desc">All periods grouped with service and lease charges together, preserving stream labels.</div></div><div class="toolbar"><input id="combined-start" class="input" type="date"><input id="combined-end" class="input" type="date"><button id="filter-combined" class="btn btn-quiet">Filter periods</button><button id="generate-bill" class="btn btn-secondary">Generate estimate PDF</button></div></div>${renderCombinedBilling(combined)}</section>
-  <section id="audit-panel" class="panel"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Use the PDF source and agreement stream to investigate exceptions.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date"><input id="audit-end" class="input" type="date"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div>${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</section>
-  <section id="history-panel" class="panel" style="display:none"><div class="panel-head"><div><h2>Billing history</h2><div class="panel-desc">Line-level view across invoice periods; service and lease streams stay distinct.</div></div><div class="toolbar"><input id="history-start" class="input" type="date"><input id="history-end" class="input" type="date"><button id="filter-history" class="btn btn-quiet">Filter</button></div></div>${history.length ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${history.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No billing history has been ingested.</div>'}</section>`;
+  <div class="subtabs billing-tabs" role="tablist" aria-label="Billing views">
+    <button id="billing-audit-tab" class="${state.billingTab === "audit" ? "active" : ""}" type="button" role="tab" aria-selected="${state.billingTab === "audit"}" aria-controls="audit-view">Bill comparison</button>
+    <button id="billing-history-tab" class="${state.billingTab === "history" ? "active" : ""}" type="button" role="tab" aria-selected="${state.billingTab === "history"}" aria-controls="history-view">Bill history</button>
+  </div>
+  <div id="audit-view" role="tabpanel" aria-labelledby="billing-audit-tab" ${state.billingTab === "audit" ? "" : "hidden"}>
+    <section class="panel"><div class="panel-head"><div><h2>Ingest billing PDF</h2><div class="panel-desc">Upload a selectable-text billing PDF for processing.</div></div></div><form id="billing-upload" class="filebox"><input type="file" name="file" accept="application/pdf" required><button class="btn btn-primary" style="margin-top:10px">Upload and compare</button></form></section>
+    <section id="audit-panel" class="panel"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Use the PDF source and agreement stream to investigate exceptions.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date" value="${auditRange.start}"><input id="audit-end" class="input" type="date" value="${auditRange.end}"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div><div id="audit-results">${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</div></section>
+  </div>
+  <div id="history-view" role="tabpanel" aria-labelledby="billing-history-tab" ${state.billingTab === "history" ? "" : "hidden"}>
+    <section id="combined-panel" class="panel"><div class="panel-head"><div><h2>Bill history (service + lease)</h2><div class="panel-desc">Review uploaded invoices by period, with service and lease subtotals.</div></div><div class="toolbar"><input id="combined-start" class="input" type="date" value="${historyRange.start}"><input id="combined-end" class="input" type="date" value="${historyRange.end}"><button id="filter-combined" class="btn btn-quiet">Filter periods</button></div></div><div id="combined-content">${renderCombinedBilling(combined)}</div></section>
+  </div>`;
   bindClient();
-  $("#billing-upload").onsubmit = uploadBilling;
-  $("#history-toggle").onchange = async (e) => {
-    try {
-      await api(`/api/clients/${state.clientId}/invoice-history`, {
-        method: "PUT",
-        body: JSON.stringify({ enabled: e.target.checked }),
-      });
-      notify("Invoice preference saved");
-    } catch (err) {
-      notify(err.message);
-      e.target.checked = !e.target.checked;
-    }
+  const setBillingTab = (tab) => {
+    state.billingTab = tab;
+    const auditActive = tab === "audit";
+    $("#audit-view").hidden = !auditActive;
+    $("#history-view").hidden = auditActive;
+    $("#billing-audit-tab").classList.toggle("active", auditActive);
+    $("#billing-audit-tab").setAttribute("aria-selected", String(auditActive));
+    $("#billing-history-tab").classList.toggle("active", !auditActive);
+    $("#billing-history-tab").setAttribute("aria-selected", String(!auditActive));
   };
+  $("#billing-audit-tab").onclick = () => setBillingTab("audit");
+  $("#billing-history-tab").onclick = () => setBillingTab("history");
+  bindCombinedPeriodToggles($("#combined-content"));
+  $("#billing-upload").onsubmit = uploadBilling;
   $("#filter-audit").onclick = () => filterReport("audit");
-  $("#filter-history").onclick = () => filterReport("billing-history");
   $("#filter-combined").onclick = () => filterReport("combined");
-  $("#generate-bill").onclick = generateBill;
 }
 function formatRate(amount, basis) {
   if (amount == null) return "Not available";
@@ -1859,57 +1903,41 @@ function auditTable(rows) {
 
 function renderCombinedBilling(data) {
   if (!data.periods || !data.periods.length)
-    return '<div class="empty">No combined billing data available.</div>';
+    return '<div class="empty">No uploaded bill history found in this period.</div>';
   const periodRows = data.periods
     .map(
-      (p) => `
-    <tr style="font-weight:bold;background:#f8f9fa;cursor:pointer;" class="period-header" onclick="togglePeriod('${esc(p.period_start)}')">
-      <td>${esc(p.period_start)} to ${esc(p.period_end)}</td>
-      <td colspan="7">Total: ${money(p.period_total)} (Service: ${money(p.service_total)}, Lease: ${money(p.lease_total)}) <span class="period-toggle" id="toggle-${esc(p.period_start)}">▶</span></td>
+      (period) => `
+    <tr class="period-header" data-period="${esc(period.period_start)}">
+      <td>${esc(period.period_start)} to ${esc(period.period_end)}</td>
+      <td colspan="7">Total: ${money(period.period_total)} (Service: ${money(period.service_total)}, Lease: ${money(period.lease_total)}) <button class="period-toggle" type="button" aria-expanded="false">Show details</button></td>
     </tr>
-    <tr class="period-body" id="period-${esc(p.period_start)}" style="display:none">
+    <tr class="period-body" data-period-body="${esc(period.period_start)}" hidden>
       <td colspan="8">
         <table class="nested-table">
-          <thead><tr><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Qty/Rate</th><th>Amount</th></tr></thead>
+          <thead><tr><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead>
           <tbody>
-            ${p.service_lines
+            ${[...period.service_lines, ...period.lease_lines]
               .map(
-                (l) => `
+                (line) => `
               <tr>
-                <td>${esc(l.invoice_number)}</td>
-                <td><span class="tag good">SERVICE</span></td>
-                <td>${esc(l.service_name)}</td>
-                <td>${esc(l.component_name)}</td>
-                <td>${l.charge_type}</td>
-                <td>${l.quantity} ${esc(l.rate_unit)}</td>
-                <td>${money(l.rate)}</td>
-                <td><b>${money(l.amount)}</b></td>
-              </tr>`,
-              )
-              .join("")}
-            ${p.lease_lines
-              .map(
-                (l) => `
-              <tr>
-                <td>${esc(l.invoice_number)}</td>
-                <td><span class="tag neutral">LEASE</span></td>
-                <td>${esc(l.service_name)}</td>
-                <td>${esc(l.component_name)}</td>
-                <td>${l.charge_type}</td>
-                <td>${l.quantity} ${esc(l.rate_unit)}</td>
-                <td>${money(l.rate)}</td>
-                <td><b>${money(l.amount)}</b></td>
+                <td>${esc(line.invoice_number)}</td>
+                <td><span class="tag ${line.billing_stream === "LEASE" ? "neutral" : "good"}">${esc(line.billing_stream)}</span></td>
+                <td>${esc(line.service_name)}</td>
+                <td>${esc(line.component_name)}</td>
+                <td>${esc(line.charge_type)}</td>
+                <td>${line.quantity} ${esc(line.rate_unit)}</td>
+                <td>${money(line.rate)}</td>
+                <td><b>${money(line.amount)}</b></td>
               </tr>`,
               )
               .join("")}
           </tbody>
         </table>
       </td>
-    </tr>
-  `,
+    </tr>`,
     )
     .join("");
-  return `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Qty/Rate</th><th>Amount</th></tr></thead><tbody>${periodRows}</tbody></table>
+  return `<div class="table-wrap"><table><thead><tr><th>Period</th><th colspan="7">Totals</th></tr></thead><tbody>${periodRows}</tbody></table>
     <div class="audit-summary" style="margin-top:12px;">
       <div class="audit-stat"><span>Combined total</span><strong>${money(data.combined_total)}</strong></div>
       <div class="audit-stat"><span>Service total</span><strong>${money(data.service_total)}</strong></div>
@@ -1917,16 +1945,19 @@ function renderCombinedBilling(data) {
     </div></div>`;
 }
 
-function togglePeriod(periodStart) {
-  const body = $("#period-" + periodStart);
-  const toggle = $("#toggle-" + periodStart);
-  if (body.style.display === "none") {
-    body.style.display = "table-row";
-    toggle.textContent = "▼";
-  } else {
-    body.style.display = "none";
-    toggle.textContent = "▶";
-  }
+function bindCombinedPeriodToggles(container) {
+  container.querySelectorAll(".period-header").forEach((header) => {
+    const button = header.querySelector(".period-toggle");
+    button.onclick = () => {
+      const periodBody = container.querySelector(
+        `[data-period-body="${header.dataset.period}"]`,
+      );
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      periodBody.hidden = expanded;
+      button.setAttribute("aria-expanded", String(!expanded));
+      button.textContent = expanded ? "Show details" : "Hide details";
+    };
+  });
 }
 
 async function uploadBilling(e) {
@@ -1950,7 +1981,7 @@ async function uploadBilling(e) {
   }
 }
 async function filterReport(kind) {
-  const prefix = kind === "audit" ? "audit" : kind === "combined" ? "combined" : "history";
+  const prefix = kind === "audit" ? "audit" : "combined";
   const start = $(`#${prefix}-start`).value;
   const end = $(`#${prefix}-end`).value;
   try {
@@ -1961,27 +1992,16 @@ async function filterReport(kind) {
       const panel = $("#audit-panel");
       panel.querySelector(".audit-summary").innerHTML =
         `<div class="audit-stat"><span>Billing statements in range</span><strong>${rows.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${rows.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${rows.rows.length}</strong></div>`;
-      panel.querySelector(".table-wrap")?.remove();
-      panel.insertAdjacentHTML("beforeend", auditTable(rows.rows));
-    } else if (kind === "combined") {
+      $("#audit-results").innerHTML = rows.rows.length
+        ? auditTable(rows.rows)
+        : '<div class="empty">No billing lines found in this period.</div>';
+    } else {
       const rows = await api(
         `/api/clients/${state.clientId}/billing-combined?${new URLSearchParams({ start, end })}`,
       );
-      const panel = $("#combined-panel");
-      panel.querySelector(".table-wrap")?.remove();
-      panel.insertAdjacentHTML("beforeend", renderCombinedBilling(rows));
-    } else {
-      const rows = await api(
-        `/api/clients/${state.clientId}/billing-history?${new URLSearchParams({ start, end })}`,
-      );
-      const panel = $("#history-panel");
-      panel.querySelector(".table-wrap")?.remove();
-      panel.insertAdjacentHTML(
-        "beforeend",
-        rows.length
-          ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></tr>`).join("")}</tbody></table></div>`
-          : '<div class="empty">No billing lines in that range.</div>',
-      );
+      const content = $("#combined-content");
+      content.innerHTML = renderCombinedBilling(rows);
+      bindCombinedPeriodToggles(content);
     }
     notify("Filters applied");
   } catch (e) {
@@ -1989,29 +2009,6 @@ async function filterReport(kind) {
   }
 }
 
-async function generateBill() {
-  const start = $("#combined-start").value;
-  const end = $("#combined-end").value;
-  const stream = state.billingStream || "COMBINED";
-  if (!start || !end) {
-    notify("Please select a start and end date first");
-    return;
-  }
-  try {
-    const result = await api(
-      `/api/clients/${state.clientId}/billing-forecast-pdf?${new URLSearchParams({ start, end, stream })}`,
-      { method: "POST" },
-    );
-    notify(`Estimate PDF generated: ${result.filename}`);
-    const a = document.createElement("a");
-    a.href = result.download_url;
-    a.download = result.filename;
-    a.click();
-    renderBilling();
-  } catch (e) {
-    notify(e.message);
-  }
-}
 $("#logout").onclick = logout;
 load().catch((e) => {
   $("#main").innerHTML =
