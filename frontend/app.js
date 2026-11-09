@@ -449,21 +449,6 @@ async function renderOverview() {
     }
   }
 
-  const clientRows = summary.clients
-    .map(
-      (client) => `
-    <tr>
-      <td><b>${esc(client.client_name)}</b><div class="small muted">${esc(client.client_id)}</div></td>
-      <td>${client.invoice_count}</td>
-      <td>${client.discrepancy_count ? `<span class="tag warn">${client.discrepancy_count} findings</span>` : '<span class="tag good">No findings</span>'}</td>
-      <td>${client.findings
-        .slice(0, 2)
-        .map((row) => esc(row.issue))
-        .join("<br>")}</td>
-    </tr>`,
-    )
-    .join("");
-
   $("#main").innerHTML =
     `${head("Apollo Wheels - Internal workspace", "Contract & billing control", "Review agreements, activate pricing with a second-person check, and find billing differences.")}
     <div class="cards">
@@ -488,16 +473,6 @@ async function renderOverview() {
         <button class="btn btn-quiet" onclick="go('billing')">View billing audit</button>
       </section>` : ""}
     </div>
-    ${state.role !== "structuring" ? `<section class="panel">
-      <div class="panel-head"><div><h2>Client audit summary</h2><div class="panel-desc">Clients with flagged service, pricing, quantity, or billing differences.</div></div></div>
-      ${
-        summary.load_error
-          ? `<div class="empty">${esc(summary.load_error)}</div>`
-          : clientRows
-            ? `<div class="table-wrap"><table><thead><tr><th>Client</th><th>Invoices reviewed</th><th>Status</th><th>Example findings</th></tr></thead><tbody>${clientRows}</tbody></table></div>`
-            : '<div class="empty">No clients have been seeded.</div>'
-      }
-    </section>` : ""}
     `;
 }
 
@@ -553,7 +528,7 @@ async function renderContracts() {
     `${head("Contract workspace", "Agreement review", "View a stored client agreement, or upload a new agreement for extraction.", `<span class="tag neutral">${state.role === "structuring" ? "Structuring can edit terms" : "Finance view is read-only"}</span>`)}
   <div class="contract-tabs" role="tablist" aria-label="Contract source">
     <button class="tab-btn ${state.contractMode === "existing" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "existing"}" data-tab="existing" id="tab-existing">Existing Aggrement</button>
-    <button class="tab-btn ${state.contractMode === "upload" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "upload"}" data-tab="upload" id="tab-upload">Agreement</button>
+    <button class="tab-btn ${state.contractMode === "upload" ? "active" : ""}" role="tab" aria-selected="${state.contractMode === "upload"}" data-tab="upload" id="tab-upload">Upload Agreement</button>
   </div>
 
   ${

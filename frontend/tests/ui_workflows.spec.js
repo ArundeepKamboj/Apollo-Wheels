@@ -122,7 +122,7 @@ test("Structuring users only see Overview and Contract sections", async ({
 
   await page.locator('.nav[data-page="contracts"]').click();
   await expect(page.locator("#tab-existing")).toHaveText("Existing Aggrement");
-  await expect(page.locator("#tab-upload")).toHaveText("Agreement");
+  await expect(page.locator("#tab-upload")).toHaveText("Upload Agreement");
   await page.evaluate(() => go("pricing"));
   await expect(
     page.getByRole("heading", { name: "Source document" }),
