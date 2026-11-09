@@ -477,6 +477,8 @@ function go(page) {
     state.contractUploadClientId = null;
     state.selectedAgreement = null;
     state.uploadedAgreement = null;
+    state.agreements = [];
+    state.selectedAgreementCheck = false;
     state.contractMode = "existing";
     state.contractExistingAgreementType = "";
   } else if (page !== "contracts" && !state.clientId) {
@@ -491,21 +493,6 @@ function contractClientOptions(selectedId) {
 async function renderContracts() {
   activeEvidence = null;
 
-  let agreementsList = [];
-  // Do NOT fetch until the user explicitly clicks Fetch agreement.
-  // This avoids auto-loading and keeps the left/right panes empty until fetch.
-  if (
-    state.contractMode === "existing" &&
-    state.contractExistingClientId &&
-    state.contractExistingAgreementType &&
-    state.selectedAgreementCheck // set only after Fetch agreement is pressed
-  ) {
-    agreementsList = await api(
-      `/api/clients/${state.contractExistingClientId}/agreements?type=${state.contractExistingAgreementType}`,
-    );
-  }
-  state.agreements = agreementsList;
-
   // No auto-load. selectedAgreement is only set by Fetch agreement button.
   // Upload mode uses uploadedAgreement.
   if (state.contractMode === "existing") {
@@ -514,16 +501,13 @@ async function renderContracts() {
     if (!hasPick) {
       state.selectedAgreement = null;
     }
-    // else keep whatever was set by Fetch agreement
-  } else {
-    // upload mode - uploadedAgreement is already set
-    state.selectedAgreement = null;
   }
 
   const existingSelected = state.agreements.find(
     (agreement) => agreement.id === state.selectedAgreement,
   );
-  const selected = state.uploadedAgreement || existingSelected;
+  const selected =
+    state.contractMode === "upload" ? state.uploadedAgreement : existingSelected;
   // isDraft is true only if the selected agreement has status 'draft'
   const isDraft = selected && selected.status === "draft";
   const sourceDescription = selected
@@ -610,15 +594,10 @@ async function renderContracts() {
   $("#tab-existing").onclick = async () => {
     state.contractMode = "existing";
     state.uploadedAgreement = null;
-    state.selectedAgreement = null;
-    state.contractExistingAgreementType = "";
     await renderContracts();
   };
   $("#tab-upload").onclick = async () => {
     state.contractMode = "upload";
-    state.contractExistingClientId = null;
-    state.contractExistingAgreementType = "";
-    state.selectedAgreement = null;
     await renderContracts();
   };
 
@@ -628,6 +607,7 @@ async function renderContracts() {
       state.contractExistingAgreementType = "";
       state.uploadedAgreement = null;
       state.selectedAgreement = null;
+      state.agreements = [];
       state.selectedAgreementCheck = false;
       state.pricingDraft = [];
       if (state.contractExistingClientId)
@@ -638,6 +618,7 @@ async function renderContracts() {
       state.contractExistingAgreementType = event.target.value;
       state.selectedAgreement = null;
       state.uploadedAgreement = null;
+      state.agreements = [];
       state.selectedAgreementCheck = false;
       await renderContracts();
     };
@@ -666,10 +647,7 @@ async function renderContracts() {
     $('#agreement-upload input[type="file"]').onchange = (event) => {
       if (event.target.files.length) {
         state.contractMode = "upload";
-        state.contractExistingClientId = null;
-        state.selectedAgreement = null;
         state.uploadedAgreement = null;
-        state.contractExistingAgreementType = "";
       }
     };
 
@@ -836,22 +814,11 @@ async function renderContracts() {
         stream,
         data: forecast,
       };
-      renderContracts();
+      renderForecastPreviewModal();
     };
   }
 
-  // Close preview modal when clicking outside
-  if (state.forecastPreview) {
-    // The modal will be rendered by renderTermsEditor or separately
-    // We need to render it as an overlay
-  }
-
   bindEvidenceHighlights();
-
-  // Render forecast preview modal if open
-  if (state.forecastPreview) {
-    renderForecastPreviewModal();
-  }
 }
 function confidenceLabel(item, field) {
   const score = item.field_confidence?.[field];
@@ -1063,12 +1030,9 @@ function renderForecastPreviewModal() {
 
   // Event handlers
   const closeModal = () => {
-    overlay.style.animation = "fadeIn 0.15s ease-out reverse";
-    setTimeout(() => {
-      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      state.forecastPreview = null;
-      renderContracts();
-    }, 150);
+    overlay._cleanup();
+    overlay.remove();
+    state.forecastPreview = null;
   };
 
   overlay.querySelector("#close-preview-modal").onclick = closeModal;
@@ -1234,8 +1198,6 @@ async function uploadAgreement(e) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail);
-    state.contractExistingClientId = null;
-    state.selectedAgreement = null;
     state.uploadedAgreement = data;
     notify(`${data.detected_agreement_type} identified; fields extracted`);
     await renderContracts();

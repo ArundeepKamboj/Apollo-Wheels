@@ -153,6 +153,62 @@ test("contract workspace shows source and role-specific editing after login", as
   );
 });
 
+test("contract tabs retain the selected agreement and preview close does not reload it", async ({
+  page,
+}) => {
+  await openWorkspace(page);
+  await page.locator('.nav[data-page="contracts"]').click();
+  await page.locator("#existing-client-picker").selectOption("C-1001");
+  await page.locator("#existing-agreement-type").selectOption("MSA");
+  await page.locator("#fetch-agreement").click();
+  await expect(page.locator("#pdf-viewer")).toHaveAttribute(
+    "data-state",
+    "ready",
+  );
+  await expect(page.locator("#terms-editor")).toContainText(
+    "Northstar Fleet Services, LLC",
+  );
+
+  await page.locator("#tab-upload").click();
+  await expect(page.locator("#agreement-upload")).toBeVisible();
+  await page.locator("#tab-existing").click();
+  await expect(page.locator("#existing-client-picker")).toHaveValue("C-1001");
+  await expect(page.locator("#existing-agreement-type")).toHaveValue("MSA");
+  await expect(page.locator("#terms-editor")).toContainText(
+    "Northstar Fleet Services, LLC",
+  );
+  await expect(page.locator("#pdf-viewer")).toHaveAttribute(
+    "data-state",
+    "ready",
+  );
+
+  const agreementAndPdfRequests = [];
+  page.on("request", (request) => {
+    if (
+      request.url().includes("/api/clients/C-1001/agreements?type=MSA") ||
+      (request.url().includes("/api/agreements/") &&
+        request.url().endsWith("/pdf"))
+    ) {
+      agreementAndPdfRequests.push(request.url());
+    }
+  });
+  const requestsBeforePreview = agreementAndPdfRequests.length;
+  await page.locator("#preview-billing").click();
+  await expect(
+    page.getByRole("heading", { name: "Forecast Billing Preview" }),
+  ).toBeVisible();
+  await page.locator("#close-preview-modal-btn").click();
+  await expect(page.locator(".modal-overlay")).toHaveCount(0);
+  await expect(page.locator("#pdf-viewer")).toHaveAttribute(
+    "data-state",
+    "ready",
+  );
+  await expect(page.locator("#terms-editor")).toContainText(
+    "Northstar Fleet Services, LLC",
+  );
+  expect(agreementAndPdfRequests).toHaveLength(requestsBeforePreview);
+});
+
 test("Structuring saves an MLA rate and refreshes evidence against the new PDF", async ({
   page,
 }) => {
