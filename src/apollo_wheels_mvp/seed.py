@@ -22,7 +22,7 @@ def seed_demo_data(include_workflow_history: bool = False) -> None:
     with connect() as db:
         for client_id, client_name, folder, prefix in demo_clients:
             db.execute(
-                "INSERT OR IGNORE INTO clients(id,name,include_history_on_invoice) VALUES (?,?,0)",
+                "INSERT OR IGNORE INTO clients(id,name,is_active,include_history_on_invoice) VALUES (?,?,1,0)",
                 (client_id, client_name),
             )
             for agreement_type in ("MSA", "MLA"):

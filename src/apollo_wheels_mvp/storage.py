@@ -45,6 +45,7 @@ _CLIENT_MIGRATIONS = [
     ("entity_type", "TEXT"),
     ("formation_jurisdiction", "TEXT"),
     ("registered_address", "TEXT"),
+    ("is_active", "INTEGER NOT NULL DEFAULT 1"),
 ]
 
 
@@ -106,6 +107,7 @@ def initialize() -> None:
                 formation_jurisdiction TEXT,
                 registered_address TEXT,
                 include_history_on_invoice INTEGER NOT NULL DEFAULT 0,
+                is_active INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 

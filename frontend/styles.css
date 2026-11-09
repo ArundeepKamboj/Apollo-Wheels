@@ -761,24 +761,29 @@ td input,td select {
   margin-left: 8px;
 }
 .toast {
-  position:fixed;
-  bottom:22px;
-  right:24px;
-  background:#153941;
-  color:white;
-  padding:12px 16px;
-  border-radius:7px;
-  box-shadow:var(--shadow);
-  font-size:12px;
-  opacity:0;
-  transform:translateY(10px);
-  transition:.2s;
-  pointer-events:none;
-  z-index:20
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: #153941;
+  color: white;
+  padding: 14px 24px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: all 0.25s ease-out;
+  pointer-events: none;
+  z-index: 10000;
+  max-width: 480px;
+  text-align: center;
+  min-width: 200px;
+  backdrop-filter: blur(4px);
 }
 .toast.show {
-  opacity:1;
-  transform:translateY(0)
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 .checkline {
   display:flex;

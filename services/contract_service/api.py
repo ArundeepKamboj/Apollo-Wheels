@@ -46,7 +46,7 @@ def bootstrap():
         client_rows = db.execute(
             """SELECT c.*, a.file_path FROM clients c
                JOIN agreements a ON a.client_id=c.id
-               WHERE a.is_active=1 ORDER BY c.name"""
+               WHERE a.is_active=1 AND c.is_active=1 ORDER BY c.name"""
         ).fetchall()
         clients_by_id = {}
         for row in client_rows:
@@ -154,6 +154,7 @@ async def upload_draft(
 
         # Reuse an existing client when names match, otherwise stage a new one
         # so the inactive agreement draft can retain its required client link.
+        # When client is deleted (no agreements), a new client is created with the same name.
         with connect() as db:
             clients = db.execute("SELECT id, name FROM clients").fetchall()
             normalize = lambda value: re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
@@ -164,7 +165,7 @@ async def upload_draft(
             if client is None:
                 client_id = str(uuid.uuid4())
                 db.execute(
-                    "INSERT INTO clients (id, name) VALUES (?, ?)",
+                    "INSERT INTO clients (id, name, is_active) VALUES (?, ?, 1)",
                     (client_id, client_name),
                 )
             else:
@@ -248,3 +249,14 @@ def set_invoice_history(
         if not cursor.rowcount:
             raise HTTPException(status_code=404, detail="Client not found.")
     return {"client_id": client_id, "include_history_on_invoice": payload.enabled}
+
+
+@router.delete("/api/agreements/{agreement_id}")
+def delete_agreement(
+    agreement_id: str,
+    actor: Identity = Depends(get_identity),
+):
+    """Delete (archive) an agreement. Only structuring users can delete.
+    If the client has no other active agreements (MSA or MLA), the client is also deactivated."""
+    require_role(actor, "structuring")
+    return domain.delete_agreement(agreement_id, f"{actor.role}:{actor.subject}")

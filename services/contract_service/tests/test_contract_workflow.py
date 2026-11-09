@@ -148,6 +148,41 @@ class ContractWorkflowTests(unittest.TestCase):
         with connect() as db:
             self.assertEqual(db.execute("SELECT COUNT(*) FROM agreements WHERE status='draft'").fetchone()[0], 0)
 
+    def test_saving_draft_reactivates_existing_inactive_client(self):
+        sample = PROJECT_ROOT / "samples/test_uploads/Test_Client/test_client_msa_v1.pdf"
+        actor = Identity("structuring.lee", "structuring", "user")
+        inactive_client_id = "TEST-INACTIVE-CLIENT"
+        with connect() as db:
+            db.execute(
+                "INSERT INTO clients (id, name, is_active) VALUES (?, ?, 0)",
+                (inactive_client_id, "Test Client"),
+            )
+
+        draft = run_upload(api.upload_draft(self.upload(sample.name, sample.read_bytes()), actor))
+
+        self.assertEqual(draft["detected_client_id"], inactive_client_id)
+        self.assertFalse(draft["is_new_client"])
+        self.assertNotIn(
+            inactive_client_id,
+            {client["id"] for client in api.bootstrap()["clients"]},
+        )
+
+        saved = domain.update_agreement_identifiers(
+            draft["id"], inactive_client_id, "MSA", "structuring:lee", "Test Client",
+        )
+
+        self.assertTrue(saved["is_active"])
+        self.assertIn(
+            ("Test Client", inactive_client_id),
+            {(client["name"], client["id"]) for client in api.bootstrap()["clients"]},
+        )
+        with connect() as db:
+            client = db.execute(
+                "SELECT is_active FROM clients WHERE id=?",
+                (inactive_client_id,),
+            ).fetchone()
+        self.assertEqual(client["is_active"], 1)
+
     def test_agreement_type_is_detected_from_titles_when_not_declared(self):
         self.assertEqual(detect_agreement_type(["MASTER SERVICES AGREEMENT", "Fleet service charges"]), "MSA")
         self.assertEqual(detect_agreement_type(["MASTER LEASE AGREEMENT", "Lessor and Lessee"]), "MLA")
@@ -292,6 +327,101 @@ class ContractWorkflowTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as error:
             api.set_invoice_history("missing", api.InvoiceHistorySetting(enabled=True), Identity("finance.alex", "finance", "user"))
         self.assertEqual(error.exception.status_code, 404)
+
+    def test_structuring_can_delete_agreements(self):
+        """Test that structuring users can delete agreements via the API."""
+        # Get an existing agreement ID
+        agreements = domain.list_agreements("C-1001")
+        self.assertGreater(len(agreements), 0)
+        agreement_id = agreements[0]["id"]
+
+        result = api.delete_agreement(agreement_id, Identity("structuring.lee", "structuring", "user"))
+        self.assertTrue(result["archived"])
+        self.assertIn("client_id", result)
+
+    def test_finance_cannot_delete_agreements(self):
+        """Test that finance users cannot delete agreements."""
+        agreements = domain.list_agreements("C-1001")
+        agreement_id = agreements[0]["id"] if agreements else "NORTHSTAR-MSA-001"
+
+        with self.assertRaises(HTTPException) as error:
+            api.delete_agreement(agreement_id, Identity("finance.alex", "finance", "user"))
+        self.assertEqual(error.exception.status_code, 403)
+
+    def test_delete_deactivates_client_when_no_other_active_agreements(self):
+        """Test that deleting the last agreement for a client deletes the client record."""
+        # Create a new client with a single agreement
+        with connect() as db:
+            new_client_id = "TEST-DEL-CLIENT"
+            db.execute("INSERT INTO clients(id, name) VALUES (?, ?)", (new_client_id, "Test Delete Client"))
+
+        # Upload a final agreement (not draft) for this client
+        upload = self.upload("delete_test.pdf")
+        finalized = run_upload(domain.store_upload(new_client_id, "MSA", upload, "structuring:lee"))
+
+        # Verify client has one active agreement
+        agreements = domain.list_agreements(new_client_id, active_only=True)
+        self.assertEqual(len(agreements), 1)
+
+        # Delete the agreement
+        result = api.delete_agreement(finalized["id"], Identity("structuring.lee", "structuring", "user"))
+        self.assertTrue(result["archived"])
+        self.assertTrue(result["client_deleted"])
+
+        # Verify client is removed from bootstrap
+        bootstrap_clients = {c["id"] for c in api.bootstrap()["clients"]}
+        self.assertNotIn(new_client_id, bootstrap_clients)
+
+        # Verify client record is completely gone
+        with connect() as db:
+            client = db.execute("SELECT * FROM clients WHERE id=?", (new_client_id,)).fetchone()
+            self.assertIsNone(client)
+
+    def test_delete_last_active_agreement_preserves_client_when_draft_remains(self):
+        client_id = "TEST-DEL-WITH-DRAFT"
+        with connect() as db:
+            db.execute("INSERT INTO clients(id, name) VALUES (?, ?)", (client_id, "Draft Client"))
+
+        msa_pdf = PROJECT_ROOT / "samples/contracts/Northstar_Fleet_Services/northstar_msa_v1.pdf"
+        mla_pdf = PROJECT_ROOT / "samples/contracts/Northstar_Fleet_Services/northstar_mla_v1.pdf"
+        msa = run_upload(domain.store_upload(
+            client_id, "MSA", self.upload(msa_pdf.name, msa_pdf.read_bytes()), "structuring:lee",
+        ))
+        mla = run_upload(domain.store_upload(
+            client_id, "MLA", self.upload(mla_pdf.name, mla_pdf.read_bytes()), "structuring:lee",
+        ))
+        with connect() as db:
+            db.execute(
+                """INSERT INTO agreements
+                   (id,client_id,agreement_type,version_label,filename,file_path,effective_date,
+                    status,uploaded_by,extracted_json,version,is_active)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ("TEST-DEL-DRAFT", client_id, "MSA", "1.0", "pending.pdf", "pending.pdf",
+                 "2026-01-01", "draft", "structuring:lee", "{}", 1, 0),
+            )
+
+        first_delete = api.delete_agreement(
+            msa["id"], Identity("structuring.lee", "structuring", "user"),
+        )
+        self.assertFalse(first_delete["client_deleted"])
+
+        last_active_delete = api.delete_agreement(
+            mla["id"], Identity("structuring.lee", "structuring", "user"),
+        )
+
+        self.assertTrue(last_active_delete["archived"])
+        self.assertFalse(last_active_delete["client_deleted"])
+        with connect() as db:
+            client = db.execute(
+                "SELECT id FROM clients WHERE id=?",
+                (client_id,),
+            ).fetchone()
+            draft = db.execute(
+                "SELECT status FROM agreements WHERE id=? AND client_id=?",
+                ("TEST-DEL-DRAFT", client_id),
+            ).fetchone()
+        self.assertIsNotNone(client)
+        self.assertEqual(draft["status"], "draft")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,38 @@
+
+Using the tools, frameworks, and AI stack of your choice, build and walk us through a working prototype that addresses Wheels’ contract/agreement setup/billing related problem statements.
+1. Frame the Problem - Tell us how you'd scope this. What's the MVP? What does success look like in 30 days?
+2. Design the Architecture - Sketch the AI pipeline: data sources → LLM layer → output. Which tools and why?
+3. Build the POC - Ship a working prototype. It doesn't need to be pretty — it needs to work. Impress us.
+4. Sell It to Leadership - Present your demo as if you're standing in front of the CTO. ROI, risks, next steps.
+
+make sure our plane have a take off, in flight and landing structure. We should try to narrate it in form of a story. Also, use best fit examples. start making a context in a file for this so that we can come back and revisit and update it again as well
+
+
+
+now let's start making the plan for our presentation/demo based on below for this project:
+  Using the tools, frameworks, and AI stack of your choice, build and walk us through a working prototype that addresses Wheels’ contract/agreement
+  setup/billing related problem statements.
+  1. Frame the Problem - Tell us how you'd scope this. What's the MVP? What does success look like in 30 days?
+  2. Design the Architecture - Sketch the AI pipeline: data sources → LLM layer → output. Which tools and why?
+  3. Build the POC - Ship a working prototype. It doesn't need to be pretty — it needs to work. Impress us.
+  4. Sell It to Leadership - Present your demo as if you're standing in front of the CTO. ROI, risks, next steps.
+
+  make sure our plane have a take off, in flight and landing structure. We should try to narrate it in form of a story. Also, use best fit examples. start
+  making a context in a file for this so that we can come back and revisit and update it again as well. at the end show me the file name whcih has been
+  created for this
+  ]
+
+
+  i think we were working on this. in Billing Audit part, we can rename this section to billing, for now we only want a forcast or view bill of current
+  billing period based on configuration based on contract/pricing. we can hide the part of contract vs pricing vs billing. also, not not show any history
+  for now, and also we can have a drop down of selecting one of service bill/ lease bill/ combined service+lease bill and based on selection show
+  estimated billing detail for period end date. Also, based on this we can have a button to generate the bill as a pdf id we want to do so.
+   make the changes one by one from it. current billing period should be based on user selection of start date
+  and end date. for now have only amount * quauntuity and we can have extra chanrges later. yes generated pdf should contain invoice style line items +
+  totals _ period + stream labels. keep the billing -pdf upload/ingest for now to compare against.
+  build it by dividing it into smaller tasks and comple one task at a time. current billing period should be based on user selection of start date and end
+  date. for now have only amount * quauntuity and we can have extra chanrges later. yes generated pdf should contain invoice style line items + totals _
+  period + stream labels. keep the billing -pdf upload/ingest for now to compare against.
+  don't write the plan file and directly do the code changes.
+  use friendly labels and yes date pickers should be in current month range
+  

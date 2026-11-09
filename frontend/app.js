@@ -524,7 +524,8 @@ async function renderContracts() {
     (agreement) => agreement.id === state.selectedAgreement,
   );
   const selected = state.uploadedAgreement || existingSelected;
-  const isDraft = !!state.uploadedAgreement;
+  // isDraft is true only if the selected agreement has status 'draft'
+  const isDraft = selected && selected.status === "draft";
   const sourceDescription = selected
     ? `${esc(selected.agreement_type)} Â· ${esc(selected.version_label)}`
     : "Choose an existing client or upload a new agreement.";
@@ -599,6 +600,7 @@ async function renderContracts() {
                 : '<button class="btn btn-primary" id="save-terms" disabled>Save Structuring edits</button>'
             : ""
         }
+        ${!isDraft && state.role === "structuring" ? '<button class="btn btn-danger" id="delete-agreement-btn" style="margin-left:auto">Delete Agreement</button>' : ""}
       </div>
     </section>
   </div>`;
@@ -691,6 +693,92 @@ async function renderContracts() {
     }
   }
 
+  if (selected && state.role === "structuring" && !isDraft) {
+    const deleteBtn = $("#delete-agreement-btn");
+    if (deleteBtn) {
+      deleteBtn.onclick = async () => {
+        // Show custom confirmation modal
+        const confirmOverlay = document.createElement("div");
+        confirmOverlay.className = "modal-overlay";
+        confirmOverlay.style.cssText = `
+          position: fixed; inset: 0; background: rgba(20, 50, 60, 0.8);
+          display: flex; align-items: center; justify-content: center;
+          z-index: 10000; padding: 20px; animation: fadeIn 0.15s ease-out;
+        `;
+        const confirmModal = document.createElement("div");
+        confirmModal.className = "modal-content";
+        confirmModal.style.cssText = `
+          background: white; border-radius: 12px; box-shadow: var(--shadow);
+          max-width: 500px; width: 100%; padding: 24px;
+          animation: slideUp 0.2s ease-out;
+        `;
+        confirmModal.innerHTML = `
+          <h3 style="margin:0 0 16px 0;font:700 18px 'Manrope';">Delete Agreement</h3>
+          <p style="margin:0 0 16px 0;color:#555;">
+            Delete this agreement? This action cannot be undone.<br><br>
+            <span style="color:#777;font-size:14px;">
+            If the client has no other active agreements, the client will also be removed from the system.
+            </span>
+          </p>
+          <div style="display:flex;gap:12px;justify-content:flex-end;">
+            <button id="cancel-delete" class="btn btn-secondary" style="flex:1;">Cancel</button>
+            <button id="confirm-delete" class="btn btn-danger" style="flex:1;">Delete Agreement</button>
+          </div>
+        `;
+        confirmOverlay.appendChild(confirmModal);
+        document.body.appendChild(confirmOverlay);
+
+        // Close modal handlers
+        const closeConfirmModal = () => {
+          confirmOverlay.style.animation = "fadeIn 0.15s ease-out reverse";
+          setTimeout(() => {
+            if (confirmOverlay.parentNode) confirmOverlay.parentNode.removeChild(confirmOverlay);
+          }, 150);
+        };
+        confirmModal.querySelector("#cancel-delete").onclick = closeConfirmModal;
+        confirmOverlay.onclick = (e) => { if (e.target === confirmOverlay) closeConfirmModal(); };
+
+        // Execute delete
+        confirmModal.querySelector("#confirm-delete").onclick = async () => {
+          closeConfirmModal();
+          try {
+            const response = await fetch(
+              serviceUrl(`/api/agreements/${selected.id}`),
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${state.token}`,
+                  "Content-Type": "application/json",
+                },
+              },
+            );
+            if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.detail || "Failed to delete agreement");
+            }
+            const result = await response.json();
+            notify(
+              result.client_deactivated
+                ? "Agreement deleted. Client had no other active agreements and has been removed."
+                : "Agreement deleted and archived.",
+            );
+            // Refresh bootstrap data (clients list) and agreements
+            state.apiData = await api("/api/bootstrap");
+            state.clients = state.apiData.clients;
+            state.selectedAgreement = null;
+            state.uploadedAgreement = null;
+            state.contractExistingClientId = null;
+            state.contractExistingAgreementType = "";
+            await renderContracts();
+          } catch (err) {
+            notify(err.message);
+          }
+        };
+        return;
+      };
+    }
+  }
+
   if (selected) {
     $("#download-agreement").onclick = () =>
       downloadAgreementPdf(selected).catch((error) => notify(error.message));
@@ -713,7 +801,7 @@ async function renderContracts() {
 
       const client = state.clients.find(c => c.id === state.contractExistingClientId || c.id === selected.client_id);
       const clientId = client?.id || selected.client_id;
-      const clientName = client?.name || selected.detected_client_name || "Unknown Client";
+      const clientName = client?.name || selected.detected_client_name || selected.client_name || "Unknown Client";
 
       let forecast;
       if (isDraft) {
@@ -722,9 +810,17 @@ async function renderContracts() {
       } else {
         // For existing agreements, use active pricing from billing service
         try {
-          forecast = await api(
+          const pricingForecast = await api(
             `/api/clients/${clientId}/billing-forecast?${new URLSearchParams({ start, end, stream })}`
           );
+          // If pricing API returns no lines or zero total (no pricing setup), fallback to contract-based forecast
+          const hasValidForecast = pricingForecast.lines && pricingForecast.lines.length > 0 &&
+                                   pricingForecast.total > 0;
+          if (!hasValidForecast) {
+            forecast = computeForecastFromContract(selected, start, end);
+          } else {
+            forecast = pricingForecast;
+          }
         } catch (e) {
           // Fallback to contract-based forecast if pricing API fails
           forecast = computeForecastFromContract(selected, start, end);
@@ -902,7 +998,7 @@ function renderForecastPreviewModal() {
   modal.className = "modal-content";
   modal.style.cssText = `
     background: white; border-radius: 12px; box-shadow: var(--shadow);
-    max-width: 800px; width: 100%; max-height: 85vh; overflow: auto;
+    max-width: 900px; width: 100%; max-height: 90vh; overflow: auto;
     animation: slideUp 0.2s ease-out;
   `;
 
@@ -1168,6 +1264,14 @@ async function saveDraft() {
     );
     const clientId = client?.id || agreement.detected_client_id;
     if (!clientId) throw new Error("Enter a client name before saving.");
+
+    // Check if a non-draft agreement already exists for this client + type
+    const existingAgreements = await api(`/api/clients/${clientId}/agreements?type=${agreementType}`);
+    if (existingAgreements.length > 0) {
+      notify(`Client already has an active ${agreementType} agreement in the system.`);
+      return;
+    }
+
     const response = await fetch(
       serviceUrl(`/api/agreements/${agreement.draft_id}/identifiers`),
       {
@@ -1188,9 +1292,36 @@ async function saveDraft() {
       throw new Error(err.detail || "Failed to save identifiers");
     }
     const saved = await response.json();
+
+    // After saving, transition from draft mode to saved agreement mode:
+    // - The agreement is now in 'review' status, not 'draft'
+    // - isDraft is determined by !!state.uploadedAgreement, so we set it to the saved agreement
+    // - This ensures billing preview uses the billing API (not contract-based)
     state.uploadedAgreement = saved;
+    // Keep the contract mode as-is (likely "upload" from draft flow)
+
+    // Refresh bootstrap data to show updated clients in dropdowns
     state.apiData = await api("/api/bootstrap");
     state.clients = state.apiData.clients;
+
+    // Fetch the saved agreement from the correct client to ensure we have all fields
+    const savedClient = state.clients.find(c => c.id === clientId);
+    if (savedClient) {
+      state.contractExistingClientId = savedClient.id;
+      state.contractExistingAgreementType = agreementType;
+      const agreements = await api(`/api/clients/${savedClient.id}/agreements?type=${agreementType}`);
+      state.agreements = agreements;
+      // Set selectedAgreement to the saved agreement (if it's in the list)
+      const savedInList = agreements.find(a => a.id === saved.id);
+      if (savedInList) {
+        state.selectedAgreement = saved.id;
+      }
+    }
+
+    // Switch to "View existing agreement" tab so the client shows in the dropdown
+    state.contractMode = "existing";
+    state.uploadedAgreement = null; // Clear draft mode
+
     notify("Draft saved in system");
     await renderContracts();
   } catch (err) {

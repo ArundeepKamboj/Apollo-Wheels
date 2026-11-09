@@ -345,7 +345,7 @@ def update_agreement_identifiers(
                 else:
                     client_id = str(uuid.uuid4())
                     db.execute(
-                        "INSERT INTO clients (id, name) VALUES (?, ?)",
+                        "INSERT INTO clients (id, name, is_active) VALUES (?, ?, 1)",
                         (client_id, client_name.strip()),
                     )
 
@@ -353,6 +353,7 @@ def update_agreement_identifiers(
         if not client:
             raise ValueError("Client not found.")
 
+        db.execute("UPDATE clients SET is_active=1 WHERE id=?", (client_id,))
         db.execute(
             "UPDATE agreements SET client_id=?, agreement_type=?, uploaded_by=?, status='review', is_active=1 WHERE id=?",
             (client_id, agreement_type.upper(), actor, agreement_id)
@@ -372,3 +373,62 @@ def get_agreement_file(agreement_id: str) -> Path:
     if row is None:
         raise ValueError("Agreement not found.")
     return Path(row["file_path"])
+
+
+def delete_agreement(agreement_id: str, actor: str) -> dict[str, object]:
+    """Archive an agreement and delete the client record if no agreements remain.
+
+    When a client has no more active agreements, we delete the client record entirely
+    instead of deactivating it. This simplifies the draft upload flow - if a client
+    name matches a deleted client, we create a fresh record with is_active=1.
+
+    Returns: {"archived": True, "client_deleted": bool, "client_id": str}
+    """
+    with connect() as db:
+        # Get the agreement and client info
+        agreement = db.execute(
+            "SELECT client_id, agreement_type FROM agreements WHERE id=?", (agreement_id,)
+        ).fetchone()
+        if not agreement:
+            raise ValueError("Agreement not found.")
+
+        client_id = agreement["client_id"]
+        agreement_type = agreement["agreement_type"]
+
+        # Archive the agreement
+        db.execute(
+            "UPDATE agreements SET is_active=0, status='archived', update_comment=?, uploaded_by=? WHERE id=?",
+            (f"Deleted by {actor}", actor, agreement_id)
+        )
+
+        # Check if client has any other active agreements (MSA or MLA)
+        active_count = db.execute(
+            "SELECT COUNT(*) FROM agreements WHERE client_id=? AND is_active=1",
+            (client_id,)
+        ).fetchone()[0]
+
+        client_deleted = False
+        if active_count == 0:
+            remaining_agreements = db.execute(
+                "SELECT COUNT(*) FROM agreements WHERE client_id=? AND status!='archived'",
+                (client_id,),
+            ).fetchone()[0]
+            if remaining_agreements == 0:
+                # Preserve the client and its related records while any draft or
+                # other non-archived agreement still references it.
+                db.execute("DELETE FROM billing_documents WHERE client_id=?", (client_id,))
+                db.execute("DELETE FROM audit_findings WHERE client_id=?", (client_id,))
+                db.execute("DELETE FROM pricing_components WHERE client_id=?", (client_id,))
+                db.execute("DELETE FROM pricing_approval_requests WHERE client_id=?", (client_id,))
+                db.execute(
+                    "DELETE FROM agreements WHERE client_id=? AND status='archived'",
+                    (client_id,),
+                )
+                db.execute("DELETE FROM clients WHERE id=?", (client_id,))
+                client_deleted = True
+
+        return {
+            "archived": True,
+            "client_deleted": client_deleted,
+            "client_id": client_id
+        }
