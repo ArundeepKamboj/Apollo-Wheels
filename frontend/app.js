@@ -591,7 +591,7 @@ async function renderContracts() {
         ${
           selected
             ? isDraft
-              ? state.role === "structuring"
+              ? state.role === "structuring" || state.role === "finance"
                 ? '<button class="btn btn-primary" id="save-draft-btn">Save in system</button>'
                 : '<button class="btn btn-primary" id="save-draft-btn" disabled>Save in system</button>'
               : state.role === "structuring"
@@ -683,10 +683,10 @@ async function renderContracts() {
     renderContracts();
   };
 
-  if (selected && state.role === "structuring") {
+  if (selected && (state.role === "structuring" || state.role === "finance")) {
     if (isDraft) {
       $("#save-draft-btn").onclick = saveDraft;
-    } else {
+    } else if (state.role === "structuring") {
       $("#save-terms").onclick = saveTerms;
     }
   }
