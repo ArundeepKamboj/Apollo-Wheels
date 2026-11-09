@@ -12,8 +12,9 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from services.auth import Identity
+from apollo_wheels_mvp.documents import extract_pdf_text, parse_billing_rows, parse_key_values
 from apollo_wheels_mvp.storage import connect
-from apollo_wheels_mvp.synthetic import make_text_pdf
+from apollo_wheels_mvp.synthetic import make_text_pdf, write_demo_invoice, write_forecast_invoice
 from services.billing_service import api, domain
 from services.test_support import MemoryUpload, PROJECT_ROOT, run_upload, setup_demo
 
@@ -68,7 +69,17 @@ class BillingWorkflowTests(unittest.TestCase):
         self.assertEqual(domain.billing_history("missing"), [])
 
     def test_valid_pdf_upload_persists_document_lines_and_original_file(self):
-        result = run_upload(api.upload_billing_document("C-1001", self.pdf(), Identity("finance.alex", "finance", "user")))
+        invoice = write_demo_invoice(
+            self.root / "source",
+            "C-1001",
+            "Northstar Fleet Services",
+            "2026-02-01",
+            "2026-02-28",
+            "INV-C-1001-FEB-UNIQUE",
+            "SERVICE",
+        )
+        upload = self.pdf("invoice.pdf", invoice["path"].read_bytes())
+        result = run_upload(api.upload_billing_document("C-1001", upload, Identity("finance.alex", "finance", "user")))
         self.assertEqual(result["status"], "ingested")
         self.assertEqual(result["line_count"], 9)
         self.assertTrue((self.root / "documents" / f"{result['id']}_invoice.pdf").is_file())
@@ -99,20 +110,127 @@ class BillingWorkflowTests(unittest.TestCase):
         self.assertEqual(list((self.root / "documents").glob("*bad.pdf")), [])
 
     def test_pdf_upload_filename_is_sanitized_and_saved_inside_document_directory(self):
-        result = run_upload(domain.ingest_billing_pdf("C-1001", self.pdf("../../invoice.pdf"), "u"))
+        invoice = write_demo_invoice(
+            self.root / "source",
+            "C-1001",
+            "Northstar Fleet Services",
+            "2026-04-01",
+            "2026-04-30",
+            "INV-C-1001-APR-SANITIZED",
+            "SERVICE",
+        )
+        upload = self.pdf("../../invoice.pdf", invoice["path"].read_bytes())
+        result = run_upload(domain.ingest_billing_pdf("C-1001", upload, "u"))
         path = next((self.root / "documents").glob(f"{result['id']}_*.pdf"))
         self.assertTrue(path.is_file())
         self.assertEqual(path.parent, self.root / "documents")
 
-    def test_repeated_invoice_upload_is_currently_not_deduplicated(self):
-        first = run_upload(domain.ingest_billing_pdf("C-1001", self.pdf(), "u"))
-        second = run_upload(domain.ingest_billing_pdf("C-1001", self.pdf(), "u"))
-        self.assertNotEqual(first["id"], second["id"])
-        self.assertEqual(first["invoice_number"], second["invoice_number"])
+    def test_duplicate_seeded_invoice_upload_is_rejected_without_adding_rows(self):
+        with connect() as db:
+            documents_before = db.execute(
+                "SELECT COUNT(*) FROM billing_documents WHERE client_id='C-1001'"
+            ).fetchone()[0]
+            lines_before = db.execute(
+                "SELECT COUNT(*) FROM billing_lines WHERE billing_document_id IN "
+                "(SELECT id FROM billing_documents WHERE client_id='C-1001')"
+            ).fetchone()[0]
+
+        with self.assertRaisesRegex(ValueError, "has already been uploaded"):
+            run_upload(domain.ingest_billing_pdf("C-1001", self.pdf(), "u"))
+
+        with connect() as db:
+            self.assertEqual(
+                db.execute("SELECT COUNT(*) FROM billing_documents WHERE client_id='C-1001'").fetchone()[0],
+                documents_before,
+            )
+            self.assertEqual(
+                db.execute(
+                    "SELECT COUNT(*) FROM billing_lines WHERE billing_document_id IN "
+                    "(SELECT id FROM billing_documents WHERE client_id='C-1001')"
+                ).fetchone()[0],
+                lines_before,
+            )
+
+    def test_billing_history_ignores_previously_ingested_duplicate_documents(self):
+        original_rows = domain.billing_history("C-1001", "2026-02-01", "2026-02-28")
+        with connect() as db:
+            original = db.execute(
+                "SELECT * FROM billing_documents WHERE client_id='C-1001' AND invoice_number='INV-C-1001-FEB-SERVICE'"
+            ).fetchone()
+            db.execute(
+                """INSERT INTO billing_documents
+                   (id,client_id,invoice_number,billing_stream,period_start,period_end,filename,file_path,status,uploaded_by)
+                   VALUES ('duplicate-doc',?,?,?,?,?,?,?,?,?)""",
+                tuple(original[key] for key in (
+                    "client_id", "invoice_number", "billing_stream", "period_start", "period_end",
+                    "filename", "file_path", "status", "uploaded_by",
+                )),
+            )
+            db.execute(
+                """INSERT INTO billing_lines
+                   (id,billing_document_id,agreement_id,agreement_type,billing_stream,service_code,service_name,
+                    component_code,component_name,charge_type,quantity,rate,rate_unit,amount,currency)
+                   SELECT 'duplicate-'||id,'duplicate-doc',agreement_id,agreement_type,billing_stream,service_code,
+                          service_name,component_code,component_name,charge_type,quantity,rate,rate_unit,amount,currency
+                   FROM billing_lines WHERE billing_document_id=?""",
+                (original["id"],),
+            )
+
+        rows = domain.billing_history("C-1001", "2026-02-01", "2026-02-28")
+        self.assertEqual(len(rows), len(original_rows))
+
+    def test_forecast_pdf_is_styled_and_keeps_uploadable_line_data(self):
+        result = write_forecast_invoice(
+            self.root / "documents",
+            "C-1001",
+            "Northstar Fleet Services",
+            "2026-04-01",
+            "2026-04-30",
+            "FORECAST-C-1001-APR-SERVICE",
+            "SERVICE",
+            [{
+                "billing_stream": "SERVICE",
+                "service_code": "FUEL",
+                "service_name": "Fuel",
+                "component_code": "monthly_per_vehicle",
+                "component_name": "Monthly per vehicle",
+                "charge_type": "recurring",
+                "quantity": 500,
+                "rate": 3.5,
+                "rate_unit": "vehicle_month",
+                "amount": 1750,
+                "currency": "USD",
+            }],
+            1750,
+        )
+
+        text = extract_pdf_text(result["path"])
+        metadata = parse_key_values(text)
+        rows = parse_billing_rows(text)
+        self.assertIn("NOT AN INVOICE", text)
+        self.assertIn("Northstar Fleet Services", text)
+        self.assertNotIn("SAMPLE AGREEMENT", text)
+        self.assertEqual(metadata["INVOICE_NUMBER"], "FORECAST-C-1001-APR-SERVICE")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["service_code"], "FUEL")
+        self.assertEqual(rows[0]["amount"], 1750)
 
     def test_api_rejects_invalid_role_but_current_demo_allows_both_roles_to_ingest(self):
         for role in ("finance", "structuring"):
-            result = run_upload(api.upload_billing_document("C-1001", self.pdf(), Identity(f"{role}.user", role, "user")))
+            invoice = write_demo_invoice(
+                self.root / "source",
+                "C-1001",
+                "Northstar Fleet Services",
+                "2026-04-01",
+                "2026-04-30",
+                f"INV-C-1001-APR-{role.upper()}",
+                "SERVICE",
+            )
+            result = run_upload(api.upload_billing_document(
+                "C-1001",
+                self.pdf("invoice.pdf", invoice["path"].read_bytes()),
+                Identity(f"{role}.user", role, "user"),
+            ))
             self.assertEqual(result["status"], "ingested")
         with self.assertRaises(HTTPException) as error:
             run_upload(api.upload_billing_document("C-1001", self.pdf(), Identity("bad", None, "service")))
@@ -187,4 +305,3 @@ class BillingWorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -1786,11 +1786,11 @@ async function renderBilling() {
   ]);
   const client = state.clients.find((c) => c.id === state.clientId);
   $("#main").innerHTML =
-    `${head("Billing workspace", "Billing audit & history", "Ingest billing PDFs, compare billed line items with contract and active pricing, and inspect service-level history.", `<div class="toolbar">${clientPicker()}</div>`)}
+    `${head("Billing workspace", "Billing audit", "Ingest billing PDFs and compare billed line items with contract and active pricing.", `<div class="toolbar">${clientPicker()}</div>`)}
   <div class="split"><section class="panel"><div class="panel-head"><div><h2>Ingest billing PDF</h2><div class="panel-desc">Upload a selectable-text billing PDF for processing.</div></div></div><form id="billing-upload" class="filebox"><input type="file" name="file" accept="application/pdf" required><button class="btn btn-primary" style="margin-top:10px">Upload and compare</button></form></section><section class="panel"><div class="panel-head"><div><h2>Invoice preferences</h2><div class="panel-desc">Client setting is controlled by internal Finance.</div></div></div><label class="checkline"><input id="history-toggle" type="checkbox" ${client?.include_history_on_invoice ? "checked" : ""} ${state.role !== "finance" ? "disabled" : ""}> Include prior billing history in generated pricing PDFs</label><div class="notice">Client-facing email/PDF delivery is a later phase. This setting is retained as a future invoice preference.</div></section></div>
-  <section class="panel"><div class="panel-head"><div><h2>Combined billing view (service + lease)</h2><div class="panel-desc">All periods grouped with service and lease charges together, preserving stream labels.</div></div><div class="toolbar"><input id="combined-start" class="input" type="date"><input id="combined-end" class="input" type="date"><button id="filter-combined" class="btn btn-quiet">Filter periods</button><button id="generate-bill" class="btn btn-secondary">Generate actual bill</button></div></div>${renderCombinedBilling(combined)}</section>
-  <section class="panel"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Use the PDF source and agreement stream to investigate exceptions.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date"><input id="audit-end" class="input" type="date"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div>${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</section>
-  <section class="panel"><div class="panel-head"><div><h2>Billing history</h2><div class="panel-desc">Line-level view across invoice periods; service and lease streams stay distinct.</div></div><div class="toolbar"><input id="history-start" class="input" type="date"><input id="history-end" class="input" type="date"><button id="filter-history" class="btn btn-quiet">Filter</button></div></div>${history.length ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${history.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No billing history has been ingested.</div>'}</section>`;
+  <section id="combined-panel" class="panel"><div class="panel-head"><div><h2>Combined billing view (service + lease)</h2><div class="panel-desc">All periods grouped with service and lease charges together, preserving stream labels.</div></div><div class="toolbar"><input id="combined-start" class="input" type="date"><input id="combined-end" class="input" type="date"><button id="filter-combined" class="btn btn-quiet">Filter periods</button><button id="generate-bill" class="btn btn-secondary">Generate estimate PDF</button></div></div>${renderCombinedBilling(combined)}</section>
+  <section id="audit-panel" class="panel"><div class="panel-head"><div><h2>Contract vs pricing vs billing</h2><div class="panel-desc">Use the PDF source and agreement stream to investigate exceptions.</div></div><div class="toolbar"><input id="audit-start" class="input" type="date"><input id="audit-end" class="input" type="date"><button id="filter-audit" class="btn btn-quiet">Filter periods</button></div></div><div class="audit-summary"><div class="audit-stat"><span>Billing statements in range</span><strong>${audit.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${audit.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${audit.rows.length}</strong></div></div>${audit.rows.length ? auditTable(audit.rows) : '<div class="empty">No billing lines found in this period.</div>'}</section>
+  <section id="history-panel" class="panel" style="display:none"><div class="panel-head"><div><h2>Billing history</h2><div class="panel-desc">Line-level view across invoice periods; service and lease streams stay distinct.</div></div><div class="toolbar"><input id="history-start" class="input" type="date"><input id="history-end" class="input" type="date"><button id="filter-history" class="btn btn-quiet">Filter</button></div></div>${history.length ? `<div class="table-wrap"><table><thead><tr><th>Period</th><th>Invoice</th><th>Stream</th><th>Service</th><th>Component</th><th>Quantity</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${history.map((r) => `<tr><td>${esc(r.period_start)}</td><td>${esc(r.invoice_number)}</td><td><span class="tag neutral">${esc(r.billing_stream)}</span></td><td>${esc(r.service_name)}</td><td>${esc(r.component_name)}</td><td>${r.quantity} ${esc(r.rate_unit)}</td><td>${money(r.rate)}</td><td><b>${money(r.amount)}</b></td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No billing history has been ingested.</div>'}</section>`;
   bindClient();
   $("#billing-upload").onsubmit = uploadBilling;
   $("#history-toggle").onchange = async (e) => {
@@ -1958,7 +1958,7 @@ async function filterReport(kind) {
       const rows = await api(
         `/api/clients/${state.clientId}/audit?${new URLSearchParams({ start, end })}`,
       );
-      const panel = document.querySelectorAll(".panel")[3];
+      const panel = $("#audit-panel");
       panel.querySelector(".audit-summary").innerHTML =
         `<div class="audit-stat"><span>Billing statements in range</span><strong>${rows.invoice_count}</strong></div><div class="audit-stat"><span>Line-level exceptions</span><strong>${rows.discrepancy_count}</strong></div><div class="audit-stat"><span>Rows reviewed</span><strong>${rows.rows.length}</strong></div>`;
       panel.querySelector(".table-wrap")?.remove();
@@ -1967,14 +1967,14 @@ async function filterReport(kind) {
       const rows = await api(
         `/api/clients/${state.clientId}/billing-combined?${new URLSearchParams({ start, end })}`,
       );
-      const panel = document.querySelectorAll(".panel")[2];
+      const panel = $("#combined-panel");
       panel.querySelector(".table-wrap")?.remove();
       panel.insertAdjacentHTML("beforeend", renderCombinedBilling(rows));
     } else {
       const rows = await api(
         `/api/clients/${state.clientId}/billing-history?${new URLSearchParams({ start, end })}`,
       );
-      const panel = document.querySelectorAll(".panel")[4];
+      const panel = $("#history-panel");
       panel.querySelector(".table-wrap")?.remove();
       panel.insertAdjacentHTML(
         "beforeend",
@@ -2002,7 +2002,7 @@ async function generateBill() {
       `/api/clients/${state.clientId}/billing-forecast-pdf?${new URLSearchParams({ start, end, stream })}`,
       { method: "POST" },
     );
-    notify(`Bill generated: ${result.filename}`);
+    notify(`Estimate PDF generated: ${result.filename}`);
     const a = document.createElement("a");
     a.href = result.download_url;
     a.download = result.filename;

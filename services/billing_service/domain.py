@@ -71,6 +71,16 @@ async def ingest_billing_pdf(client_id: str, upload: UploadFile, uploaded_by: st
         if not lines or not start or not end:
             raise ValueError("Could not find billing period and line items in this PDF.")
         with connect() as db:
+            existing = db.execute(
+                """SELECT id FROM billing_documents
+                   WHERE client_id=? AND invoice_number=? AND billing_stream=?
+                     AND period_start=? AND period_end=? LIMIT 1""",
+                (client_id, invoice_number, stream, start, end),
+            ).fetchone()
+            if existing:
+                raise ValueError(
+                    f"Invoice {invoice_number} for {start} through {end} has already been uploaded for this client."
+                )
             db.execute(
                 """INSERT INTO billing_documents
                 (id,client_id,invoice_number,billing_stream,period_start,period_end,filename,file_path,status,uploaded_by)
@@ -101,12 +111,21 @@ async def ingest_billing_pdf(client_id: str, upload: UploadFile, uploaded_by: st
 
 
 def billing_history(client_id: str, start: str | None = None, end: str | None = None) -> list[dict[str, object]]:
-    query = """SELECT bd.id,bd.invoice_number,bd.billing_stream AS document_stream,
+    query = """WITH ranked_documents AS (
+                   SELECT bd.*,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY client_id,invoice_number,billing_stream,period_start,period_end
+                              ORDER BY CASE WHEN uploaded_by='seed' THEN 0 ELSE 1 END,created_at,id
+                          ) AS duplicate_rank
+                   FROM billing_documents bd WHERE client_id=?
+               )
+               SELECT bd.id,bd.invoice_number,bd.billing_stream AS document_stream,
                      bd.period_start,bd.period_end,bd.filename,
                      bl.service_code,bl.service_name,bl.component_code,bl.component_name,bl.charge_type,
                      bl.billing_stream,bl.quantity,bl.rate,bl.rate_unit,bl.amount,bl.currency
               FROM billing_documents bd JOIN billing_lines bl ON bl.billing_document_id=bd.id
-              WHERE bd.client_id=?"""
+              JOIN ranked_documents ranked ON ranked.id=bd.id
+              WHERE ranked.duplicate_rank=1"""
     params: list[object] = [client_id]
     if start:
         query += " AND bd.period_start>=?"

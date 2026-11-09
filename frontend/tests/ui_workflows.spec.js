@@ -410,22 +410,16 @@ test("Finance pricing request requires a different authenticated Finance approve
   await expect(page.locator("#toast")).toContainText("now active");
 });
 
-test("billing workspace ingests PDF, shows line history, and filters by period", async ({
+test("billing audit shows comparison, hides history, and rejects duplicate invoices", async ({
   page,
 }) => {
   await openWorkspace(page);
   await page.locator('.nav[data-page="billing"]').click();
+  await expect(page.locator("#audit-panel")).toBeVisible();
+  await expect(page.locator("#history-panel")).toBeHidden();
   await page.locator('input[type="file"]').setInputFiles(sampleInvoice);
   await page.locator("#billing-upload button").click();
-  await expect(page.locator("#toast")).toContainText(
-    "Ingested 9 billing lines",
-  );
-  await expect(page.locator("body")).toContainText("INV-C-1001-FEB-SERVICE");
-  await expect(page.locator("body")).toContainText("Missing pricing setup");
-  await page.locator("#history-start").fill("2026-02-01");
-  await page.locator("#history-end").fill("2026-02-28");
-  await page.locator("#filter-history").click();
-  await expect(page.locator("body")).toContainText("History filters applied");
+  await expect(page.locator("#toast")).toContainText("has already been uploaded");
 });
 
 test("Finance controls invoice-history preference and Structuring cannot change it", async ({

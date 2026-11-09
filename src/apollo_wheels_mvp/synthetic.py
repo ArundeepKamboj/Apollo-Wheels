@@ -508,7 +508,7 @@ def write_forecast_invoice(
     lines: list[dict[str, object]],
     total: float,
 ) -> dict[str, object]:
-    """Generate an invoice-style PDF from forecasted billing lines.
+    """Generate a clearly labeled, parseable estimate PDF from forecasted lines.
 
     Args:
         folder: Output directory for the PDF
@@ -524,30 +524,215 @@ def write_forecast_invoice(
     Returns dict with filename, path, and line count.
     """
     folder.mkdir(parents=True, exist_ok=True)
-    lines_metadata = [
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="ForecastBrand", fontName="Helvetica-Bold", fontSize=14, leading=17,
+        textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastBadge", fontName="Helvetica-Bold", fontSize=8, leading=10,
+        textColor=colors.white, alignment=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastTitle", fontName="Helvetica-Bold", fontSize=20, leading=24,
+        textColor=colors.HexColor("#173b46"), spaceAfter=2,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastSubtitle", fontName="Helvetica", fontSize=8, leading=11,
+        textColor=colors.HexColor("#56676c"),
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastField", fontName="Helvetica", fontSize=8, leading=11,
+        textColor=colors.HexColor("#27363a"),
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastHead", fontName="Helvetica-Bold", fontSize=7, leading=9,
+        textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastCell", fontName="Helvetica", fontSize=7.5, leading=9,
+        textColor=colors.HexColor("#27363a"),
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastAmount", fontName="Helvetica", fontSize=7.5, leading=9,
+        alignment=2, textColor=colors.HexColor("#27363a"),
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastTotalLabel", fontName="Helvetica-Bold", fontSize=10, leading=13,
+        textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastTotalAmount", fontName="Helvetica-Bold", fontSize=12, leading=14,
+        alignment=2, textColor=colors.white,
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastNote", fontName="Helvetica", fontSize=7, leading=9,
+        textColor=colors.HexColor("#56676c"),
+    ))
+    styles.add(ParagraphStyle(
+        name="ForecastMachine", fontName="Courier", fontSize=4.5, leading=5.5,
+        textColor=colors.HexColor("#647477"),
+    ))
+
+    def paragraph(value: object, style: str) -> Paragraph:
+        return Paragraph(_pdf_safe(value), styles[style])
+
+    def currency(value: object, code: object = "USD") -> str:
+        return f"{code} {float(value or 0):,.2f}"
+
+    machine_rows = [
         f"INVOICE_NUMBER: {numbering}",
+        f"CLIENT_ID: {client_id}",
+        f"CLIENT_NAME: {client_name}",
         f"BILLING_STREAM: {billing_stream}",
         f"PERIOD_START: {period_start}",
         f"PERIOD_END: {period_end}",
         "All values are forecast estimates based on active pricing.",
     ]
-
-    # Build invoice line rows
-    # Format: LINE|STREAM|CODE|NAME|COMPONENT|CHARGE_TYPE|QTY|RATE|UNIT|AMOUNT
-    invoice_rows = []
+    table_rows = [[
+        paragraph("STREAM", "ForecastHead"),
+        paragraph("SERVICE / COMPONENT", "ForecastHead"),
+        paragraph("CHARGE", "ForecastHead"),
+        paragraph("QUANTITY", "ForecastHead"),
+        paragraph("RATE", "ForecastHead"),
+        paragraph("AMOUNT", "ForecastHead"),
+    ]]
     for line in lines:
-        qty = line.get("quantity", 0)
+        quantity = line.get("quantity", 0)
         rate = line.get("rate", 0)
         amount = line.get("amount", 0)
-        unit = line.get("rate_unit", "").replace("_", " ")
-        invoice_rows.append(
-            f"LINE|{line['billing_stream']}|{line['service_code']}|{line['service_name']}|"
-            f"{line['component_code']}|{line['charge_type']}|{qty}|{rate:.2f}|{unit}|{amount:.2f}"
+        unit = str(line.get("rate_unit", ""))
+        currency_code = line.get("currency", "USD")
+        table_rows.append([
+            paragraph(line.get("billing_stream", ""), "ForecastCell"),
+            paragraph(
+                f"<b>{_pdf_safe(line.get('service_name', ''))}</b><br/>"
+                f"{_pdf_safe(line.get('component_name', ''))}",
+                "ForecastCell",
+            ),
+            paragraph(line.get("charge_type", ""), "ForecastCell"),
+            paragraph(f"{float(quantity):g} {unit.replace('_', ' ')}", "ForecastAmount"),
+            paragraph(currency(rate, currency_code), "ForecastAmount"),
+            paragraph(currency(amount, currency_code), "ForecastAmount"),
+        ])
+        machine_rows.append(
+            f"LINE|{line.get('billing_stream', '')}|{line.get('service_code', '')}|"
+            f"{line.get('service_name', '')}|{line.get('component_code', '')}|"
+            f"{line.get('charge_type', '')}|{float(quantity):g}|{float(rate):.2f}|{unit}|{float(amount):.2f}"
         )
 
-    all_lines = ["APOLLO WHEELS — FORECAST BILLING STATEMENT"] + lines_metadata + invoice_rows + ["END_OF_INVOICE"]
-    pdf_path = folder / f"{numbering.lower()}.pdf"
-    pdf_path.write_bytes(make_text_pdf(all_lines))
+    buffer = BytesIO()
+    document = SimpleDocTemplate(
+        buffer, pagesize=letter, leftMargin=.65 * inch, rightMargin=.65 * inch,
+        topMargin=.65 * inch, bottomMargin=.65 * inch, title=f"Billing estimate - {client_name}",
+        author="Apollo Wheels",
+    )
+    flow = [
+        Table(
+            [[paragraph("APOLLO WHEELS", "ForecastBrand"),
+              paragraph("FORECAST ESTIMATE", "ForecastBadge")]],
+            colWidths=[3.6 * inch, 3.6 * inch],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#173b46")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ]),
+        ),
+        Spacer(1, 18),
+        paragraph("Billing estimate", "ForecastTitle"),
+        paragraph("Planning estimate only - not an invoice or payment request.", "ForecastSubtitle"),
+        Spacer(1, 14),
+        Table(
+            [[
+                Paragraph(
+                    f"<b>CLIENT</b><br/>{_pdf_safe(client_name)}<br/>Account: {_pdf_safe(client_id)}",
+                    styles["ForecastField"],
+                ),
+                Paragraph(
+                    f"<b>ESTIMATE DETAILS</b><br/>Reference: {_pdf_safe(numbering)}<br/>"
+                    f"Period: {_pdf_safe(period_start)} to {_pdf_safe(period_end)}"
+                    f"<br/>Stream: {_pdf_safe(billing_stream)}",
+                    styles["ForecastField"],
+                ),
+            ]],
+            colWidths=[3.6 * inch, 3.6 * inch],
+            style=TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#eef4f3")),
+                ("BOX", (0, 0), (-1, -1), .5, colors.HexColor("#d7e0df")),
+                ("INNERGRID", (0, 0), (-1, -1), .5, colors.HexColor("#d7e0df")),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 9),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ]),
+        ),
+        Spacer(1, 18),
+    ]
+    item_table = Table(
+        table_rows,
+        colWidths=[.72 * inch, 1.85 * inch, .9 * inch, 1.2 * inch, 1.1 * inch, 1.15 * inch],
+        repeatRows=1,
+        hAlign="LEFT",
+    )
+    item_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#126b69")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7f6")]),
+        ("LINEBELOW", (0, 0), (-1, 0), .6, colors.HexColor("#126b69")),
+        ("LINEBELOW", (0, 1), (-1, -1), .35, colors.HexColor("#d7e0df")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (3, 0), (-1, -1), "RIGHT"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    flow.extend([item_table, Spacer(1, 10)])
+    total_table = Table(
+        [[paragraph("ESTIMATED TOTAL", "ForecastTotalLabel"),
+          paragraph(currency(total), "ForecastTotalAmount")]],
+        colWidths=[4.5 * inch, 2.4 * inch],
+        style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#173b46")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 9),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ]),
+    )
+    flow.extend([
+        total_table,
+        Spacer(1, 12),
+        paragraph(
+            "Estimate based on the active pricing setup and configured quantities. "
+            "Actual billing may differ due to usage, proration, credits, taxes, or other adjustments.",
+            "ForecastNote",
+        ),
+        Spacer(1, 10),
+        paragraph("Structured data for audit upload", "ForecastNote"),
+    ])
+    flow.extend(paragraph(line, "ForecastMachine") for line in machine_rows)
+
+    def page_chrome(canvas, doc):
+        canvas.saveState()
+        canvas.setStrokeColor(colors.HexColor("#d7e0df"))
+        canvas.line(doc.leftMargin, .48 * inch, letter[0] - doc.rightMargin, .48 * inch)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(colors.HexColor("#657477"))
+        canvas.drawString(doc.leftMargin, .32 * inch, "APOLLO WHEELS  |  FORECAST ESTIMATE - NOT AN INVOICE")
+        canvas.drawRightString(letter[0] - doc.rightMargin, .32 * inch, f"Page {doc.page}")
+        canvas.restoreState()
+
+    document.build(flow, onFirstPage=page_chrome, onLaterPages=page_chrome)
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", numbering).strip("._")
+    if not safe_name:
+        raise ValueError("Estimate reference must include letters or numbers.")
+    pdf_path = folder / f"{safe_name.lower()}.pdf"
+    pdf_path.write_bytes(buffer.getvalue())
     return {"invoice_number": numbering, "filename": pdf_path.name, "path": pdf_path, "line_count": len(lines), "total": total}
 
 
