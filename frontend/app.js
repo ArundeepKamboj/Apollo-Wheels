@@ -396,6 +396,7 @@ async function render() {
 
   try {
     state.apiData = await api("/api/bootstrap");
+    state.clients = state.apiData.clients;
     $("#pending-nav").textContent = state.apiData.counts.pending_approvals;
     const pages = {
       overview: renderOverview,
@@ -1260,6 +1261,7 @@ async function saveDraft() {
     // - isDraft is determined by !!state.uploadedAgreement, so we set it to the saved agreement
     // - This ensures billing preview uses the billing API (not contract-based)
     state.uploadedAgreement = saved;
+    state.clientId = clientId;
     // Keep the contract mode as-is (likely "upload" from draft flow)
 
     // Refresh bootstrap data to show updated clients in dropdowns
@@ -1435,7 +1437,7 @@ async function renderPricing() {
 <div class="notice"><b>Data design:</b> each charge component is a separately versioned record. Common pricing fields are indexed; optional pricing-specific fields stay in a flexible terms payload. Activation writes to the internal pricing database.</div>
 <section class="panel"><div class="panel-head"><div><h2>Active pricing</h2><div class="panel-desc">${active.length} active component records Â· retained versions remain available for history</div></div><span class="tag good">${active.length ? "Active" : "No active setup"}</span></div>${active.length ? `<div class="table-wrap"><table><thead><tr><th>Stream</th><th>Service</th><th>Component</th><th>Charge</th><th>Rate</th><th>Rate unit</th><th>Qty</th><th>Frequency</th><th>Version</th></tr></thead><tbody>${active.map((c) => `<tr><td>${esc(c.billing_stream)}</td><td>${esc(c.service_name)}</td><td>${esc(c.component_name)}</td><td>${esc(c.charge_type)}</td><td>${displayRate(c)}</td><td>${esc(c.rate_unit)}</td><td>${c.quantity}</td><td>${esc(c.billing_frequency)}</td><td>v${c.version}</td></tr>`).join("")}</tbody></table></div>` : '<div class="empty">No active pricing records.</div>'}</section>
 <div class="split"><section class="panel"><div class="panel-head"><div><h2>Prepare pricing version</h2><div class="panel-desc">Choose the agreement set, review each charge, then send to a second Finance approver.</div></div></div><div class="row"><button class="btn btn-secondary" id="load-contract-pricing" ${state.role !== "finance" ? "disabled" : ""}>Load subscribed contract terms</button><button class="btn btn-quiet" id="add-component" ${state.role !== "finance" ? "disabled" : ""}>+ Add component</button></div><div id="pricing-editor" class="pricing-list" style="margin-top:12px"></div><div class="row spread" style="margin-top:14px"><span class="small muted">Submitter: ${esc(state.userId)}</span><button class="btn btn-primary" id="submit-pricing" ${state.role !== "finance" ? "disabled" : ""}>Request second-person approval</button></div></section>
-<section class="panel"><div class="panel-head"><div><h2>Four-eyes queue</h2><div class="panel-desc">A different Finance user must approve the request to activate pricing.</div></div><span class="tag ${pending.length ? "warn" : "good"}">${pending.length} pending</span></div>${pending.length ? pending.map((r) => `<div class="approval"><h3>Pricing version v${r.version}</h3><div class="approval-meta">Initiated by ${esc(r.initiated_by)} Â· ${esc(r.created_at)} Â· ${esc(r.id.slice(0, 8))}</div><button class="btn btn-primary approve-btn" data-id="${r.id}" ${state.role !== "finance" || r.initiated_by === state.userId ? "disabled" : ""}>Approve and activate</button>${r.initiated_by === state.userId ? '<div class="small muted" style="margin-top:7px">Sign in as a different Finance user to approve.</div>' : ""}</div>`).join("") : '<div class="empty">No pricing requests are waiting for approval.</div>'}</section></div>`;
+<section class="panel"><div class="panel-head"><div><h2>Four-eyes queue</h2><div class="panel-desc">Review the submitted rates and terms before a different Finance user approves.</div></div><span class="tag ${pending.length ? "warn" : "good"}">${pending.length} pending</span></div>${pending.length ? pending.map((r) => `<div class="approval"><h3>Pricing version v${r.version}</h3><div class="approval-meta">Initiated by ${esc(r.initiated_by)} Â· ${esc(r.created_at)} Â· ${esc(r.id.slice(0, 8))}</div><button class="btn btn-primary review-pricing-btn" data-id="${esc(r.id)}">Review pricing details</button>${r.initiated_by === state.userId ? '<div class="small muted" style="margin-top:7px">Sign in as a different Finance user to approve.</div>' : ""}</div>`).join("") : '<div class="empty">No pricing requests are waiting for approval.</div>'}</section></div>`;
   bindClient();
   renderPricingEditor();
   $("#load-contract-pricing").onclick = loadDraftFromContracts;
@@ -1461,9 +1463,16 @@ async function renderPricing() {
     renderPricingEditor();
   };
   $("#submit-pricing").onclick = submitPricing;
-  document
-    .querySelectorAll(".approve-btn")
-    .forEach((b) => (b.onclick = () => approvePricing(b.dataset.id)));
+  document.querySelectorAll(".review-pricing-btn").forEach((button) => {
+    button.onclick = () => {
+      const request = pending.find((item) => item.id === button.dataset.id);
+      if (!request) throw new Error("Pricing approval request not found.");
+      const components = data.components.filter(
+        (component) => component.approval_request_id === request.id,
+      );
+      renderPricingApprovalModal(request, components);
+    };
+  });
 }
 function renderPricingEditor() {
   const host = $("#pricing-editor");
@@ -1654,6 +1663,87 @@ async function approvePricing(id) {
   } catch (e) {
     notify(e.message);
   }
+}
+function renderPricingApprovalModal(request, components) {
+  const overlay = document.createElement("div");
+  overlay.className = "modal-overlay";
+  overlay.style.cssText =
+    "position:fixed;inset:0;background:rgba(20,50,60,.6);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px";
+  const modal = document.createElement("div");
+  modal.className = "modal-content";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", "Pricing approval details");
+  modal.style.cssText =
+    "background:white;border-radius:12px;box-shadow:var(--shadow);max-width:1000px;width:100%;max-height:90vh;overflow:auto";
+  const clientName =
+    state.clients.find((client) => client.id === request.client_id)?.name ||
+    request.client_id;
+  const componentRows = components
+    .map((component) => {
+      const agreement = state.agreements.find(
+        (item) => item.id === component.agreement_id,
+      );
+      const terms =
+        typeof component.terms_json === "string"
+          ? JSON.parse(component.terms_json || "{}")
+          : component.terms || {};
+      const termDetails = Object.entries(terms)
+        .filter(([, value]) => value !== null && value !== "")
+        .map(
+          ([key, value]) =>
+            `${esc(key.replaceAll("_", " "))}: ${esc(value)}`,
+        )
+        .join("<br>");
+      return `<tr><td>${esc(agreement?.filename || component.agreement_type)}</td><td>${esc(component.billing_stream)}</td><td>${esc(component.service_name)}<div class="small muted">${esc(component.component_name)}</div></td><td>${esc(component.charge_type)}</td><td>${displayRate(component)}</td><td>${esc(component.quantity)} ${esc(component.rate_unit)}</td><td>${esc(component.billing_frequency)}${component.billing_day ? ` (day ${esc(component.billing_day)})` : ""}</td><td>${esc(component.effective_from)}</td><td>${termDetails || "—"}</td></tr>`;
+    })
+    .join("");
+  const canApprove =
+    state.role === "finance" && request.initiated_by !== state.userId;
+  modal.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);">
+      <div>
+        <h2 style="margin:0;font:700 16px 'Manrope';">Review pricing version v${esc(request.version)}</h2>
+        <div class="small muted" style="margin-top:4px;">${esc(clientName)} · Submitted by ${esc(request.initiated_by)} · Effective ${esc(request.effective_from)}</div>
+      </div>
+      <button class="icon-btn" id="close-pricing-review" aria-label="Close pricing review" style="font-size:20px;color:var(--muted);">×</button>
+    </div>
+    <div style="padding:20px;">
+      <div class="table-wrap" style="max-height:55vh;overflow:auto;">
+        <table>
+          <thead><tr><th>Agreement</th><th>Stream</th><th>Service / component</th><th>Charge</th><th>Rate</th><th>Quantity</th><th>Frequency</th><th>Effective from</th><th>Pricing terms</th></tr></thead>
+          <tbody>${componentRows || '<tr><td colspan="9" class="empty">No pricing components were submitted.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="row spread" style="margin-top:16px;">
+        <span class="small muted">${components.length} component${components.length === 1 ? "" : "s"} in this request</span>
+        <div class="row">
+          <button class="btn btn-quiet" id="cancel-pricing-review">Close</button>
+          <button class="btn btn-primary" id="approve-reviewed-pricing" ${canApprove && components.length ? "" : "disabled"}>Approve and activate this version</button>
+        </div>
+      </div>
+      ${request.initiated_by === state.userId ? '<div class="small muted" style="margin-top:10px;">Four-eyes control: the submitter cannot approve this request.</div>' : ""}
+    </div>`;
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const closeModal = () => {
+    document.removeEventListener("keydown", handleEscape);
+    overlay.remove();
+  };
+  const handleEscape = (event) => {
+    if (event.key === "Escape") closeModal();
+  };
+  modal.querySelector("#close-pricing-review").onclick = closeModal;
+  modal.querySelector("#cancel-pricing-review").onclick = closeModal;
+  overlay.onclick = (event) => {
+    if (event.target === overlay) closeModal();
+  };
+  modal.querySelector("#approve-reviewed-pricing").onclick = () => {
+    closeModal();
+    approvePricing(request.id);
+  };
+  document.addEventListener("keydown", handleEscape);
 }
 async function renderBilling() {
   const [history, audit, combined] = await Promise.all([

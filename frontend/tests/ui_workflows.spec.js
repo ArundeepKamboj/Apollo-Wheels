@@ -317,10 +317,32 @@ test("Finance pricing request requires a different authenticated Finance approve
   await expect(page.locator("#toast")).toContainText(
     "waiting for second approval",
   );
-  await expect(page.locator(".approve-btn").first()).toBeDisabled();
+  const review = page.locator(".review-pricing-btn").first();
+  await review.click();
+  const ownReview = page.getByRole("dialog", {
+    name: "Pricing approval details",
+  });
+  await expect(ownReview).toContainText("Fuel");
+  await expect(ownReview).toContainText("Pricing terms");
+  await expect(ownReview).toContainText(/\$\d+\.\d{2}/);
+  await expect(
+    ownReview.getByRole("button", {
+      name: "Approve and activate this version",
+    }),
+  ).toBeDisabled();
+  await ownReview.getByRole("button", { name: "Close", exact: true }).click();
   await signIn(page, "testfinance2", "FinanceSecondDemo!2026");
   await page.locator('.nav[data-page="pricing"]').click();
-  const approve = page.locator(".approve-btn").first();
+  await page.locator(".review-pricing-btn").first().click();
+  const secondReview = page.getByRole("dialog", {
+    name: "Pricing approval details",
+  });
+  await expect(secondReview).toContainText("Fuel");
+  await expect(secondReview).toContainText("Pricing terms");
+  await expect(secondReview).toContainText(/\$\d+\.\d{2}/);
+  const approve = secondReview.getByRole("button", {
+    name: "Approve and activate this version",
+  });
   await expect(approve).toBeEnabled();
   await approve.click();
   await expect(page.locator("#toast")).toContainText("now active");
